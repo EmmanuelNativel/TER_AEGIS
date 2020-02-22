@@ -1,0 +1,173 @@
+table.dataTable thead .sorting_asc::after,
+table.dataTable thead .sorting_desc::after {
+  opacity: 0.8;
+  color: #06a181;
+}
+
+/*==============================================================================
+                  Graphique comparatif d'unités expérimentales
+==============================================================================*/
+
+#expUnitGraph {
+  min-width: 650px;
+}
+
+.line {
+  fill: none;
+  /*stroke: steelblue;*/
+  stroke-width: 2px;
+}
+
+.circle {
+    fill: white;
+    /*stroke: steelblue;*/
+    stroke-width: 2px;
+}
+
+.focusCircle
+{
+  stroke: red;
+  opacity: 0.8;
+  fill: none;
+}
+
+.area {
+  /*fill: steelblue;*/
+  opacity: 0.2;
+}
+
+.variableLabelContainer {
+  fill: slategrey;
+}
+
+.variableLabel {
+  font-size:16px;
+  font-weight:bold;
+}
+
+.variableScaleCode {
+  font-size:13px;
+  fill: black;
+  font-weight:bold;
+}
+
+.indicatorsBox {
+  fill: #a9b1b3;
+  fill-opacity: 0.1;
+  stroke: grey;
+  stroke-width:2;
+  opacity: 0.5;
+}
+
+.indicatorDate {
+  font-size: 13px;
+  fill: slategrey;
+  font-weight:bold;
+}
+
+.valueLabel {
+  dominant-baseline: middle;
+  font-weight: bold;
+}
+
+#verticalLineContainer
+{
+  position: absolute;
+}
+
+#verticalLine
+{
+  stroke: slategrey;
+  stroke-width:2;
+}
+
+#mouseRectangle
+{
+
+    /* fill: blue;
+    opacity: 0.5; */
+    fill: none;
+    stroke: none;
+    pointer-events: all;
+}
+
+.valueHelpBtn {
+  width: 25px;
+  height: 15px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1.42857;
+  vertical-align: baseline;
+}
+
+.valueHelpBtn span {
+  position: relative;
+  bottom: 3px;
+}
+
+/*==============================================================================
+                       Graphique d'unités expérimentales 2D
+==============================================================================*/
+
+.gridLine {
+  fill: none;
+  shape-rendering: crispEdges;
+  stroke: grey;
+  stroke-opacity: 0.3;
+  stroke-width: 1px;
+}
+
+#expUnit2D_tooltip {
+  position: absolute;
+  min-width: 100px;
+  max-width: 200px;
+  min-height: 100px;
+  max-height: 300px;
+  padding: 10px;
+  padding-top: 3px;
+  z-index: 10;
+  visibility: hidden;
+  background-color: rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  box-shadow: 3px 3px 3px 0px #ccc;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 5px;
+  border-color: black;
+  overflow-wrap: break-word;
+  font-size: 13px;
+}
+
+#expUnit2D_tooltip .tooltipTitle {
+  text-align:center;
+  font-size: 15px;
+  font-weight: bold;
+  color: #06a181;
+}
+
+#expUnit2D_tooltip .tooltipLi {
+  font-size: 15px;
+  font-weight: bold;
+  color: #06a181;
+}
+
+#expUnit2D_tooltip .tooltipItemText{
+  font-weight: bold;
+  color: black;
+}
+
+#expUnit2D_tooltip .tooltipObsDate{
+  font-family: sans-serif;
+}
+
+#expUnit2D_tooltip .tooltipFactorName{
+  font-weight: bold;
+  color: slategrey;
+}
+
+#expUnit2D_tooltip .tooltipFactorLevel{
+  font-size: 14px;
+  font-family: sans-serif;
+  color: #595959;
+}

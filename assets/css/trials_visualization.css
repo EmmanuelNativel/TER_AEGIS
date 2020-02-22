@@ -1,0 +1,156 @@
+/* Pour éviter le troncage des textes dans la vue liste*/
+.dl-horizontal dt
+{
+    white-space: normal;
+}
+
+/* ========================= Style pour la map ===============================*/
+
+#trialsMap {
+  height: 500px;
+  width: 100%;
+}
+
+/*                            ___ Markers ___                                 */
+.marker-cluster-small {
+	background-color: rgba(181, 226, 140, 0.6);
+}
+.marker-cluster-small div {
+	background-color: rgba(110, 204, 57, 0.6);
+}
+
+.marker-cluster-medium {
+	background-color: rgba(241, 211, 87, 0.6);
+}
+.marker-cluster-medium div {
+	background-color: rgba(240, 194, 12, 0.6);
+}
+
+.marker-cluster-large {
+	background-color: rgba(253, 156, 115, 0.6);
+}
+.marker-cluster-large div {
+	background-color: rgba(241, 128, 23, 0.6);
+}
+
+.marker-cluster {
+	background-clip: padding-box;
+	border-radius: 20px;
+}
+.marker-cluster div {
+	width: 30px;
+	height: 30px;
+	margin-left: 5px;
+	margin-top: 5px;
+
+	text-align: center;
+	border-radius: 15px;
+	font: 15px "Helvetica Neue", Arial, Helvetica, sans-serif;
+  color: black;
+}
+.marker-cluster span {
+	line-height: 30px;
+}
+
+
+/* ========================= Style pour les onglets ==========================*/
+
+.tab-content > .tab-pane {
+    display: block;
+    height:0;
+    overflow:hidden;
+}
+
+.tab-content > .active {
+    display: block;
+    height:auto;
+}
+
+/* ========================= Style filtre facteurs ===========================*/
+
+.factorUL {
+  word-wrap: break-word;
+  margin-left: 10px;
+}
+
+.levelUL {
+  word-wrap: break-word;
+  list-style-type: none;
+  margin-left: 20px;
+}
+
+.levelsDiv {
+  display:inline-block;
+  width:100%;
+}
+
+.factorLi {
+  padding-left:0 !important;
+  font-weight: bold;
+  color:#06a181;
+}
+
+.factorLi:not(:first-child) {
+  margin-top: 10px; /*Espacement entre les li facteurs*/
+}
+
+.levelLi {
+  padding-left:0 !important;
+  color:#4d5157;
+}
+
+.levelLi:before {
+  content: '\2014';
+  position: absolute;
+  margin-left: -20px;
+}
+
+.factorSelect {
+  margin-top: 0px !important; /*important pour override factorLi margintop */
+}
+
+.factorSelectLevel {
+  margin-top:5px;
+}
+
+.factorSelectLevel .btn,
+.factorSelect .btn {
+  height: 30px;
+  padding-top: 3px;
+}
+
+.btnRemoveFactor {
+  font-size: 0.8em;
+  color:#8e3c3c;
+  vertical-align: baseline;
+  padding-left: 5px;
+}
+
+.btnRemoveFactor:hover {
+  -webkit-transform: scale(1.2);
+  -ms-transform: scale(1.2);
+  transform: scale(1.2);
+  cursor: pointer;
+}
+
+.btnRemoveLevel {
+  padding-right: 1px;
+  padding-top:5px;
+  font-size: 0.9em;
+}
+
+.btnRemoveLevel:hover {
+  -webkit-transform: scale(1.1);
+  -ms-transform: scale(1.1);
+  transform: scale(1.1);
+  cursor: pointer;
+  color:#8e3c3c;
+}
+
+
+/* ========================= Autres ===========================*/
+.fixed-panel {
+  min-height: 100px;
+  max-height: 250px;
+  overflow: auto;
+}

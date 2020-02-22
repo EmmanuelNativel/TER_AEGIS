@@ -1,0 +1,20 @@
+/*Avant*/
+[type="checkbox"].access:not(:checked) + label:before,
+[type="checkbox"].access:checked + label:before {
+  width: 93px;
+}
+[type="checkbox"].access:not(:checked) + label .ui:before {
+  content: "Lecture";
+}
+/*Pendant*/
+[type="checkbox"].access:not(:checked) + label,
+[type="checkbox"].access:checked + label {
+  margin-left: -23px;
+}
+/*Aprés*/
+[type="checkbox"].access:checked + label .ui:after {
+  content: "Ecriture";
+}
+[type="checkbox"].access:checked + label:after {
+  left: 65px;
+}

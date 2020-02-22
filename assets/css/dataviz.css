@@ -1,0 +1,12 @@
+.highcharts-container {
+    overflow: visible !important;
+}
+.MyChartTooltip {
+    position: absolute;
+    z-index: 50;
+    border: 5px solid rgb(0, 108, 169);
+    border-radius: 5px;
+    background-color: #ffffff;
+    padding: 5px;
+    font-size: 9pt;
+}

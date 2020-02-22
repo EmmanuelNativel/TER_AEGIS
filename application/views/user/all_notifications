@@ -1,0 +1,11 @@
+<div class="fullwidth-block">
+  <div class="container">
+    <div class="col-md-6 col-md-offset-3">
+      <?php
+        foreach ($this->session->userdata('notifications') as $notification) {
+          $this->load->view('notification', $notification);
+        }
+      ?>
+    </div>
+  </div>
+</div>

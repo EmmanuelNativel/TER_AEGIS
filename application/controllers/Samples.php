@@ -1,0 +1,840 @@
+<?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+class Samples extends MY_Controller {
+
+	public function __construct()
+    {
+        parent::__construct();
+        if (!$this->session->userdata('connected')) {
+            set_status_header(401);
+            show_error("Vous devez être connecté pour accéder à cette page. <a href=\"" . site_url('welcome/login') . "\">Connexion</a>", 401);
+            return;
+        }
+
+        $this->load->helper(array('form', 'url'));
+        $this->load->library('form_validation');
+        $this->form_validation->set_error_delimiters('<div class="alert alert-danger"><span class="glyphicon glyphicon-warning-sign"></span>', '</div>');
+        $this->load->model(array('Sample_model','Exp_unit_model','Entity_model','Sample_stage_model'));
+    }
+
+    /**
+     * Affiche la page principale permettant d'acceder au différentes fonctionnalités de la gestion des échantillons
+     */
+    public function index()
+    {
+        // Titre de la page
+        $page['title'] = 'Gestion des échantillons';
+        $page['subtitle'] = '';
+
+        $data['empty'] ="";
+
+        $scripts = array('bootstrap-select-ajax-plugin');
+        $this->view('sample/accueil', $page['title'], $page['subtitle'], $data, $scripts);
+    }
+
+	/**
+     * Lien de téléchargement du formulaire d'importation des echantillons
+     */
+    public function download_form()
+    {
+        $this->load->helper('download');
+        $file_path = 'download_forms/Import_sample.xlsx';//chemin absolu de mon fichier dans serveur
+        force_download($file_path, NULL);
+    }
+
+	public function create()
+    {
+        // Titre de la page
+        $page['title'] = 'Création de nouveaux échantillons';
+        $page['subtitle'] = 'Formulaire de saisie des nouveaux échantillons';
+
+        // Chargement des modèle et extraction de quelques données pour l'affichage de la page
+        $this->load->model('Trial_model');
+        $data['trials'] = $this->Trial_model->get_all_trial_data();
+        $data['entities'] = $this->Entity_model->get_all_entity_data();
+        $data['exps_unit'] = $this->Exp_unit_model->get_all_exp_unit_data();
+        $data['samples_stage'] = $this->Sample_stage_model->get_all_sample_stage_data();
+
+        // Récupération des données du formulaire
+        $data['sample_type'] = $this->input->post('sample_type');
+        $data['sample_plant_code'] = $this->input->post('sample_plant_code');
+        $data['sample_entity'] = $this->input->post('sample_entity');
+        $data['sample_entity_ref'] = $this->input->post('sample_entity_ref');
+        $data['sample_entity_level'] = $this->input->post('sample_entity_level');
+        $data['sample_stage'] = $this->input->post('sample_stage');
+        $data['selected_exp_unit'] = $this->input->post('exp_unit[]');
+        $data['essai_name'] = $this->input->post('essai_name');
+
+
+        // Règles de validation du formulaire
+        $this->form_validation->set_rules('sample_type', 'Type de l\'échantillon', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+        $this->form_validation->set_rules('sample_plant_code', 'Code de la plante', 'required|trim|min_length[1]|max_length[10]|xss_clean');
+        $this->form_validation->set_rules('sample_entity', 'Entité échantillon', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('sample_entity_ref', 'Référence entité échantillon', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('sample_entity_level', 'Niveau entité échantillon', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('sample_stage', 'Stade de l\'échantillon', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+        $this->form_validation->set_rules('exp_unit[]', 'Expérience unitaire', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+        $this->form_validation->set_rules('essai_name', 'Essai', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+
+        if ($this->form_validation->run()) {
+            $this->load->helper('postgre');
+            $data = nullify_array($data); // Remplace les chaines de carctères vide par la valeur NULL
+            $array_sample_create = array();
+
+            foreach ($this->input->post('exp_unit[]') as $key => $id_exp_unit) {
+                $lowest_id = $this->Sample_model->get_lowest_code_available();
+                $str_lowest = (string)$lowest_id;
+                $num_length = strlen($str_lowest);
+                if ($num_length<12) {
+                    for ($i=0; $i < 12-$num_length; $i++) {
+                        $str_lowest = '0'.$str_lowest;
+                    }
+                }
+                $this->Sample_model->create(
+                    array(
+                        'sample_code' => $str_lowest,
+                        'sample_type' => $data['sample_type'],
+                        'sample_plant_code' => $data['sample_plant_code'],
+                        'sample_entity' => $data['sample_entity'],
+                        'sample_entity_ref' => $data['sample_entity_ref'],
+                        'sample_entity_level' => $data['sample_entity_level'],
+                        'sample_st' => $data['sample_stage'],
+                        'unit_id' => $id_exp_unit
+                    )
+                );
+
+                array_push($array_sample_create, $str_lowest);
+
+            }
+            $data['tab_sample_create'] = $array_sample_create;
+
+            $this->session->set_flashdata('insert_sample_ok', TRUE);
+        }
+
+
+        // Affichage du formulaire de création d'un echantillon et retour des erreurs
+        $scripts = array('bootstrap-select-ajax-plugin', 'new_sample');
+        $this->view('sample/new_sample', $page['title'], $page['subtitle'], $data, $scripts);
+    }
+
+    /**
+    * Ajout d'un nouvel sample stage
+    * S'il y a des erreurs :
+    *   - elles sont placées dans le flashdata pour les passées à la vue
+    *   - les données saisies sont également dans le flashdata pour les passées à la vue
+    * Redirection vers la création d'un échantillon
+    */
+    public function create_sample_stage()
+    {
+        // Chargement du modèle
+        //$this->load->model(array('Sample_stage_model'));
+
+        // Récupération des données du formulaire de saisie d'un sample stage (modal)
+        $data['essai_name_sample_stage'] = $this->input->post('essai_name_add_sample_stage');
+        $data['add_sample_stage_name'] = $this->input->post('add_sample_stage_name');
+        $data['add_sample_stage_physio_stage'] = $this->input->post('add_sample_stage_physio_stage');
+
+        // Règles de validation du formulaire
+        $this->form_validation->set_rules('essai_name_add_sample_stage', 'Essai', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('add_sample_stage_name', 'Sample stage name', 'required|trim|min_length[1]|max_length[10]|xss_clean');
+        $this->form_validation->set_rules('add_sample_stage_physio_stage', 'Sample stage physio stage', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+
+        if ($this->form_validation->run()) {
+            $this->load->helper('postgre');
+            $data = nullify_array($data); // Remplace les chaines de carctères vide par la valeur NULL
+            $this->Sample_stage_model->create(
+                array(
+                    'st_name' => $data['add_sample_stage_name'],
+                    'st_physio_stage' => $data['add_sample_stage_physio_stage'],
+                    'trial_code' => $data['essai_name_sample_stage']
+                )
+            );
+            $this->session->set_flashdata('sample_stage_operation', 1);
+        }
+
+        // Gestion des erreurs passées à la vue avec le flashdata
+        $array_error = array();
+        $array_value = array();
+        $array_error = $this->form_validation->error_array();
+        if (count($array_error)>0) {
+            $array_value["essai_name_sample_stage"] = $data['essai_name_sample_stage'];
+            $array_value["add_sample_stage_name"] = $data['add_sample_stage_name'];
+            $array_value["add_sample_stage_physio_stage"] = $data['add_sample_stage_physio_stage'];
+        }
+
+        $this->session->set_flashdata('errors_add_sample_stage', $array_error);
+        $this->session->set_flashdata('add_sample_stage_values', $array_value);
+        redirect('samples/create', 'location');
+
+    }
+
+    /**
+    * Modification d'un sample stage
+    * S'il y a des erreurs :
+    *   - elles sont placées dans le flashdata pour les passées à la vue
+    *   - les données saisies sont également dans le flashdata pour les passées à la vue
+    * Redirection vers la création d'un échantillon
+    */
+    public function update_sample_stage()
+    {
+        // Chargement du modèle
+        //$this->load->model(array('Sample_stage_model'));
+
+        // Récupération des données du formulaire de modification d'un sample stage (modal)
+        $data['essai_name_sample_stage'] = $this->input->post('essai_name_update_sample_stage');
+        $data['update_sample_stage_id'] = $this->input->post('update_sample_stage');
+        $data['update_sample_stage_name'] = $this->input->post('update_sample_stage_name');
+        $data['update_sample_stage_physio_stage'] = $this->input->post('update_sample_stage_physio_stage');
+
+        // Règles de validation du formulaire
+        $this->form_validation->set_rules('essai_name_update_sample_stage', 'Essai', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('update_sample_stage', 'Sample stage', 'required|trim|integer|xss_clean');
+        $this->form_validation->set_rules('update_sample_stage_name', 'Sample stage name', 'required|trim|min_length[1]|max_length[10]|xss_clean');
+        $this->form_validation->set_rules('update_sample_stage_physio_stage', 'Sample stage physio stage', 'required|trim|min_length[1]|max_length[255]|xss_clean');
+
+        if ($this->form_validation->run()) {
+            $this->load->helper('postgre');
+            $data = nullify_array($data); // Remplace les chaines de carctères vide par la valeur NULL
+                $this->Sample_stage_model->update(
+                array(
+                    'st_name' => $data['update_sample_stage_name'],
+                    'st_physio_stage' => $data['update_sample_stage_physio_stage'],
+                    'trial_code' => $data['essai_name_sample_stage']
+                ), $data['update_sample_stage_id']
+            );
+            $this->session->set_flashdata('sample_stage_operation', 2);
+        }
+
+        // Gestion des erreurs passées à la vue avec le flashdata
+        $array_error = array();
+        $array_value = array();
+        $array_error = $this->form_validation->error_array();
+        if (count($array_error)>0) {
+            $array_value['essai_name_sample_stage'] = $data['essai_name_sample_stage'];
+            $array_value['update_sample_stage_id'] = $data['update_sample_stage_id'];
+            $array_value['update_sample_stage_name'] = $data['update_sample_stage_name'] ;
+            $array_value['update_sample_stage_physio_stage'] = $data['update_sample_stage_physio_stage'];
+        }
+
+        $this->session->set_flashdata('errors_update_sample_stage', $array_error);
+        $this->session->set_flashdata('update_sample_stage_values', $array_value);
+        redirect('samples/create', 'location');
+    }
+
+    /**
+    * Suppression d'un sample stage
+    * S'il y a des erreurs :
+    *   - elles sont placées dans le flashdata pour les passées à la vue
+    *   - les données saisies sont également dans le flashdata pour les passées à la vue
+    * Redirection vers la création d'un échantillon
+    */
+    public function delete_sample_stage()
+    {
+        // Chargement du modèle
+        //$this->load->model(array('Sample_stage_model'));
+
+        // Récupération des données du formulaire de suprression d'un sample stage (modal)
+        $data['essai_name_sample_stage'] = $this->input->post('essai_name_delete_sample_stage');
+        $data['delete_sample_stage_id'] = $this->input->post('delete_sample_stage');
+
+        // Règles de validation du formulaire
+        $this->form_validation->set_rules('essai_name_delete_sample_stage', 'Essai', 'required|trim|min_length[1]|max_length[50]|xss_clean');
+        $this->form_validation->set_rules('delete_sample_stage', 'Sample stage', 'required|trim|integer|xss_clean');
+
+        if ($this->form_validation->run()) {
+            $this->load->helper('postgre');
+            $data = nullify_array($data); // Remplace les chaines de carctères vide par la valeur NULL
+
+            $this->Sample_stage_model->remove(
+                $data['delete_sample_stage_id']
+            );
+            $this->session->set_flashdata('sample_stage_operation', 3);
+        }
+
+        // Gestion des erreurs passées à la vue avec le flashdata
+        $array_error = array();
+        $array_value = array();
+        $array_error = $this->form_validation->error_array();
+        if (count($array_error)>0) {
+            $array_value['essai_name_sample_stage'] = $data['essai_name_sample_stage'];
+            $array_value['delete_sample_stage_id'] = $data['delete_sample_stage_id'];
+        }
+
+        $this->session->set_flashdata('errors_delete_sample_stage', $array_error);
+        $this->session->set_flashdata('delete_sample_stage_values', $array_value);
+        redirect('samples/create', 'location');
+    }
+
+    /**
+    * Affichage de la page de prélèvement des échantillons
+    *
+    * Modifications des échantillons récoltés
+    */
+    public function sampling()
+    {
+        // Titre de la page
+        $page['title'] = 'Prélèvement des échantillons';
+        $page['subtitle'] = 'Formulaire de prélèvement des échantillons';
+
+
+        $arrayTest = array();
+        $array_error = array();
+
+        //parcours des variables $_post pour update chaque sample en $_post
+        foreach($_POST as $key => $value){
+            $array_ex_key = explode("_", $key);
+            if (strcmp($array_ex_key[0], "nb") ==0) {
+                $code = $array_ex_key[1];
+                $val_nb = $value;
+                $val_date = $this->input->post('date_'.$code.'');
+                if ($val_nb != '' && $val_date != '') {
+                    $rqt = $this->Sample_model->update(
+                        array(
+                            'sample_nb_objects' => $val_nb,
+                            'harvest_date' => $val_date
+                        ), $code
+                    );
+                    if ($rqt) {
+                        $data['message_ok_update'] = TRUE;
+                    }
+                }else{
+                    array_push($array_error, [$code, $val_nb, $val_date]);
+                }
+            }
+            array_push($arrayTest, $key);
+        }
+        $data['array_post'] = $arrayTest;
+        $data['array_error'] = $array_error;
+
+        $data['not_collected_sample'] = $this->Sample_model->get_not_collected_sample();
+        $this->load->library('table');
+
+        $scripts = array('jquery.dataTables', 'dataTables.bootstrap', 'bootstrap-select-ajax-plugin', 'sampling');
+        $this->view('sample/sampling', $page['title'], $page['subtitle'], $data, $scripts);
+    }
+
+    public function consultation()
+    {
+        // Titre de la page
+        $page['title'] = 'Consultation des échantillons';
+        $page['subtitle'] = 'Consultation et extraction des échantillons';
+
+        $this->load->model('Trial_model');
+        $data['trials'] = $this->Trial_model->get_all_trial_data();
+        $data['list_all_sample'] = $this->Sample_model->get_all_sample_with_current_nb_and_trial();
+
+        $this->load->library('table');
+
+        $scripts = array('jquery.dataTables', 'dataTables.bootstrap', 'bootstrap-select-ajax-plugin', 'sample_consultation');
+        $this->view('sample/consultation', $page['title'], $page['subtitle'], $data, $scripts);
+    }
+
+    function extract_bar_code(){
+
+        //liste des champs(bdd) a extraire de la base de données
+        $data['bdd_selected_field'] = $this->input->post('add_field_extract_code[]');
+        //liste des champs (en francais)
+        $data['text_selected_field'] = $this->input->post('text_selected_field[]');
+        //liste des échantillons sélectionnés
+        $data['list_selected_sample'] = $this->input->post('list_selected_sample[]');
+
+        if (count($data['list_selected_sample'])>0) {
+            $this->load->library('excel');
+            $this->load->library('table');
+
+            $object = new PHPExcel();
+
+            $object->setActiveSheetIndex(0);
+
+            //set les nom des colonnes
+            $table_columns = array("Code échantillon");
+            if (count($data['text_selected_field'])>0) {
+                foreach ($data['text_selected_field'] as $key => $field) {
+                    array_push($table_columns, $field);
+                }
+            }
+            $column = 0;
+            foreach ($table_columns as $key => $field) {
+                $object->getActiveSheet()->setCellValueByColumnAndRow($column, 1, $field);
+                $column++;
+            }
+
+
+            // ajout des informations pour chaque échantillon
+            $row = 2;
+            foreach ($data['list_selected_sample'] as $key => $sample_code) {
+                $sample_info = $this->Sample_model->get_sample_with_current_nb($sample_code);
+
+                $object->getActiveSheet()->setCellValueByColumnAndRow(0, $row, "".$sample_info[0]["sample_code"]."");
+                $column = 1;
+                if (count($data['bdd_selected_field'])>0) {
+                    foreach ($data['bdd_selected_field'] as $key => $field_name) {
+                        $object->getActiveSheet()->setCellValueByColumnAndRow($column, $row, $sample_info[0][$field_name]);
+                        $column++;
+                    }
+                }
+
+                $row++;
+            }
+
+            $object_writer= PHPExcel_IOFactory::createWriter($object, 'Excel5');
+            header('Content-Type: application/vnd.ms-excel');
+            header('Content-Disposition: attachment;filename="Code_barres_echantillon.xls"');
+            $object_writer->save('php://output');
+        }else{
+            redirect('samples/consultation', 'location');
+        }
+    }
+
+    function ajax_get_sample_for_consultation(){
+            // Datatables Variables
+            $draw = intval($this->input->get("draw"));
+            $start = intval($this->input->get("start"));
+            $length = intval($this->input->get("length"));
+
+
+            $list_all_sample = $this->Sample_model->get_all_sample_with_current_nb_and_trial();
+            $count_sample = $this->Sample_model->count_sample();
+
+            $results  = array();
+            foreach ($list_all_sample as $key => $sample) {
+               array_push($results, array($sample['sample_code'], $sample['sample_type'], $sample['sample_nb_objects'], $sample['sample_plant_code'], $sample['sample_entity'], $sample['sample_entity_ref'], $sample['st_name'], $sample['trial_code']
+               ));
+            }
+
+            $output = array(
+               "draw" => $draw,
+                 "recordsTotal" => $count_sample,
+                 "recordsFiltered" => $count_sample,
+                 "data" => $results
+            );
+            echo json_encode($output);
+
+    }
+
+	public function import() {
+
+		$page['title'] = "Importation des échantillons";
+        $page['subtitle'] = "Formulaire d'importation des échantillons";
+
+        $config['upload_path'] = UPLOAD_PATH;//Le chemin d'accès au répertoire où le téléchargement doit être placé.
+        $config['allowed_types'] = 'xls|xlsx'; // Autres extensions de la librairie phpexcel xml|ods|slk|gnumeric|csv|htm|html
+        $config['encrypt_name'] = TRUE;
+
+
+		//$this->load->model(array('Exp_unit_model','Entity_model','Sample_stage_model'));
+
+        $this->load->library('excel');
+        $this->load->library('table');
+        $this->load->library('upload', $config);
+
+        $this->form_validation->set_rules('trial_code', 'Essai', 'trim|required|alpha_dash|max_length[50]|xss_clean');
+
+		$scripts = array('bootstrap-select-ajax-plugin');
+		$data = array();
+
+        // if not successful, set the error message
+        if (!$this->form_validation->run() || !$this->upload->do_upload('sample_file')) {
+            $data['error'] = $this->upload->display_errors('<div class="alert alert-danger"><span class="glyphicon glyphicon-warning-sign"></span>', '</div>');
+            $this->view('sample/import', $page['title'], $page['subtitle'], $data , $scripts );
+		}
+		else {
+			try {
+
+				$trial_code = $this->input->post('trial_code');
+
+                $upload_data = $this->upload->data();//return mon fichier de téléchargement
+
+                PHPExcel_Settings::setZipClass(PHPExcel_Settings::PCLZIP);
+                PHPExcel_Settings:: setZipClass(PHPExcel_Settings :: ZIPARCHIVE);
+                $objPHPExcel = PHPExcel_IOFactory::load($upload_data['full_path']);//full_path est le chemin absolu vers le serveur y compris le nom de mon fichier excel
+
+				// récupère tous les noms de feuilles du fichier
+                $worksheetNames = $objPHPExcel->getSheetNames($upload_data['full_path']);
+                $worksheetArray = array();
+
+                foreach ($worksheetNames as $key => $sheetName) { //parcours de chaque feuille
+					if ($sheetName != 'Lexicon') {
+						//set the current active worksheet by name
+						$objPHPExcel->setActiveSheetIndexByName($sheetName);
+						// crée un tableau assoc avec le nom de la feuille en tant que clé et le tableau des contenus de la feuille comme valeur
+						$worksheetArray[$sheetName] = $objPHPExcel->getActiveSheet();
+					}
+				}
+
+				$nbreDeLignesSample = $objPHPExcel->setActiveSheetIndex(0)->getHighestRow();
+				$nbreDeLignesExp_unit = $objPHPExcel->setActiveSheetIndex(1)->getHighestRow();
+				$nbreDeLignesEntity = $objPHPExcel->setActiveSheetIndex(2)->getHighestRow();
+				$nbreDeLignesSample_Stage = $objPHPExcel->setActiveSheetIndex(3)->getHighestRow();
+
+				//definition des tableaux contenant les colonnes de base des feuilles du fichier d'import
+				$waiting_sample_header = array('sample_code','unit_code','sample_entity_code','sample_stage_name','sample_type','sample_nb_objects','sample_plant_code','sample_entity_ref','sample_entity_level','harvest_date');
+				$waiting_exp_unit_header = array('num_level','unit_code','trial_code','assigned_to','level_label','x_coord','y_coord','unit_lat','unit_long','unit_alt','nb_plant','rowspace','surface','profondeur');
+				$waiting_entity_header = array('entity_code','entity_name','entity_definition');
+				$waiting_sample_stage_header = array('st_name','st_physio_stage','trial_code');
+
+				$data['lignesErrors'] = array();
+				$data['messageErrors'] = array();
+
+				if ($nbreDeLignesSample > 1) {
+					if ($nbreDeLignesEntity > 1) {
+						$tabResultCheckData['Entity'] = $this->format_worksheetdata($trial_code, $worksheetArray['Entity'], 'Entity', $waiting_entity_header);
+						if (count($tabResultCheckData['Entity']['lignesErrors']) >0) {
+							$data['lignesErrors'] = array_merge($data['lignesErrors'],$tabResultCheckData['Entity']['lignesErrors']);
+							$data['messageErrors'] = array_merge($data['messageErrors'],$tabResultCheckData['Entity']['messageErrors']);
+							throw new Exception("Problème de données avec l'onglet Entity", 1);
+						} //si vérification données ok
+						else { //alors import
+							if (!$this->Entity_model->import($tabResultCheckData['Entity']['import_data'])){
+								array_push($data['messageErrors'], "Erreur durant l'importation dans la base pour l'onglet Entity");
+								throw new Exception("Erreur durant l'importation dans la base pour l'onglet Entity",1);
+							}
+						}
+					}
+
+					if ($nbreDeLignesSample_Stage > 1) {
+						$tabResultCheckData['Sample_stage'] = $this->format_worksheetdata($trial_code, $worksheetArray['Sample_stage'], 'Sample_stage', $waiting_sample_stage_header);
+						if (count($tabResultCheckData['Sample_stage']['lignesErrors']) >0) {
+							$data['lignesErrors'] = array_merge($data['lignesErrors'],$tabResultCheckData['Sample_stage']['lignesErrors']);
+							$data['messageErrors'] = array_merge($data['messageErrors'],$tabResultCheckData['Sample_stage']['messageErrors']);
+							throw new Exception("Problème de données avec l'onglet Sample_stage", 1);
+						}
+						else {
+							if (!$this->Sample_stage_model->import($tabResultCheckData['Sample_stage']['import_data'])){
+								array_push($data['messageErrors'], "Erreur durant l'importation dans la base pour l'onglet Sample_stage");
+								throw new Exception("Erreur durant l'importation dans la base pour l'onglet Sample_stage",1);
+							}
+						}
+					}
+
+					if ($nbreDeLignesExp_unit > 1) {
+						$tabResultCheckData['Exp_unit'] = $this->format_worksheetdata($trial_code, $worksheetArray['Exp_unit'], 'Exp_unit', $waiting_exp_unit_header);
+						if (count($tabResultCheckData['Exp_unit']['lignesErrors']) >0) {
+							$data['lignesErrors'] = array_merge($data['lignesErrors'],$tabResultCheckData['Exp_unit']['lignesErrors']);
+							$data['messageErrors'] = array_merge($data['messageErrors'],$tabResultCheckData['Exp_unit']['messageErrors']);
+							throw new Exception("Problème de données avec l'onglet Exp_unit", 1);
+						} else {
+							if (!$this->Exp_unit_model->import($tabResultCheckData['Exp_unit']['import_data'])) {
+								array_push($data['messageErrors'], "Erreur durant l'importation dans la base pour l'onglet Exp_unit");
+								throw new Exception("Erreur durant l'importation dans la base pour l'onglet Exp_unit",1);
+							}
+						}
+					}
+
+					$tabResultCheckData['Sample'] = $this->format_worksheetdata($trial_code, $worksheetArray['Sample'], 'Sample', $waiting_sample_header);
+					if (count($tabResultCheckData['Sample']['lignesErrors']) >0) {
+						$data['lignesErrors'] = array_merge($data['lignesErrors'],$tabResultCheckData['Sample']['lignesErrors']);
+						$data['messageErrors'] = array_merge($data['messageErrors'],$tabResultCheckData['Sample']['messageErrors']);
+						throw new Exception("Problème de données avec l'onglet Sample", 1);
+					} else {
+						if (!$this->Sample_model->import($trial_code, $tabResultCheckData['Sample']['import_data'])) {
+							array_push($data['messageErrors'], "Erreur durant l'importation dans la base pour l'onglet Sample");
+							throw new Exception("Erreur durant l'importation dans la base pour l'onglet Sample",1);
+						}
+					}
+					unlink($upload_data['full_path']); //remove file
+					$this->view('sample/import_success', $page['title'], $page['subtitle'], $data, $scripts);
+				}
+				else {
+					unlink($upload_data['full_path']); //remove file
+					$this->view('sample/import', $page['title'], $page['subtitle'], $data , $scripts );
+				}
+
+            } catch (Exception $e) {
+				$this->view('sample/import_success', $page['title'], $page['subtitle'], $data, $scripts);
+
+                unlink($upload_data['full_path']); // remove file
+            }
+
+		}
+	}
+
+		/**
+     * Retourne le nom du champ (formaté), si une chaine de caractères est un nom de champ valide
+     * pour le formulaire d'importation des données liées à une var. Sinon retourne FALSE
+     */
+    public function format_field($field, $waiting_main_header)
+    {
+        if (in_array(strtolower($field), $waiting_main_header)) {
+            return strtolower($field);
+        } else {
+            return FALSE;
+        }
+    }
+
+	//fonction retournant la matrice de donnees verifiees et les lignes erreurs ainsi que leur message
+	public function format_worksheetdata($trial_code, $worksheetdata, $worksheetname, $checking_header){
+
+		$header = array(); // init du tableau qui contiendra les variables que l on souhaite importer
+		$lineErrors = array();//tab qui contiendra les num de ligne du fichier dimport ou un probleme a ete rencontre
+		$messageErrors = array();//tab contenant les messages d erreur genere lors de l import
+		//$array_Line_Message_Data = array();
+
+		foreach ($worksheetdata->getRowIterator() as $row) { //parcours de chaque ligne de la feuille
+			$cellIterator = $row->getCellIterator(); //recupere un iterateur de ttes les cellules de la ligne actuelle
+			$cellIterator->setIterateOnlyExistingCells(FALSE); //Permet à itérateur de pas occulter et prendre en compte les cellules vides
+
+			foreach ($cellIterator as $cell) { //parcours de chaque cellule de la ligne
+				$cell_column = $cell->getColumn();
+				$cell_row = $cell->getRow();
+				$data_value = xss_clean($cell->getFormattedValue()); //recupere la valeur sans formatage de cellule appliquee
+
+				if ($cell_row == 1) { //  si en-tete du fichier
+					// Vérification du header, si nom colonne present dans la base
+					$field = $this->format_field($data_value, $checking_header);
+
+					if ($field) { //si la colonne du fichier d'import appartient à la base
+						$header[$cell_column] = $field; //ajout du nom du champ dans le tableau header indexe par les num de col dans la feuille excel
+					} elseif ($data_value) {
+						array_push($messageErrors, "La colonne ".$cell_column." de la feuille ".$worksheetname.", n'existe pas dans la base");
+					}
+				} else {
+					// Vérification des valeurs
+					if (isset($header[$cell_column]) && $data_value) {  // Si la colonne de la donnée fait réference à un champ défini dans le header
+						switch ($worksheetname) { //test sur le nom de la feuille
+							case 'Sample_stage':
+								switch($header[$cell_column]) { //test sur le nom de colonne
+									case 'trial_code':
+										if (!$this->Trial_model->find(array('trial_code' => $data_value))) {
+											array_push($messageErrors, "Trial_code, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$header[$cell_column]] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									case 'st_name':
+										if ($this->Sample_stage_model->find(array('trial_code' => $import_data[$cell_row]['trial_code'], 'st_name' => $data_value))) {
+											array_push($messageErrors, "Ensemble Trial_code/Sample_stage_name, ligne ".$cell_row." feuille ".$worksheetname.", existe déjà dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$header[$cell_column]] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									default:
+										$import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+								}
+								break;
+							case 'Entity':
+								if ($header[$cell_column] == 'entity_code'){
+									if ($this->Entity_model->find(array('entity_code' => $data_value))){
+										array_push($messageErrors, "entity_code, ligne ".$cell_row." feuille ".$worksheetname.", existe déjà dans la base");
+										array_push($lineErrors, $cell_row);
+										$import_data[$cell_row][$cell_column] = NULL;
+									}
+									else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+								}
+								elseif ($header[$cell_column] == 'entity_name') {
+									if ($this->Entity_model->find(array('entity_name' => $data_value))){
+										array_push($messageErrors, "entity_name, ligne ".$cell_row." feuille ".$worksheetname.", existe déjà dans la base");
+										array_push($lineErrors, $cell_row);
+										$import_data[$cell_row][$cell_column] = NULL;
+									}
+									else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+								}
+								else {
+									$import_data[$cell_row][$header[$cell_column]] = $data_value;
+								}
+								break;
+							case 'Exp_unit':
+								switch($header[$cell_column]) {
+									case 'trial_code':
+										if (!$this->Trial_model->find(array('trial_code' => $data_value))){
+											array_push($messageErrors, "trial_code, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										elseif ($this->Exp_unit_model->find(array('unit_code' => $import_data[$cell_row]['unit_code'], 'trial_code' => $data_value))){
+											array_push($messageErrors, "Ensemble unit_code/trial_code, ligne ".$cell_row." feuille ".$worksheetname.", existe déjà dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+
+										break;
+									case 'assigned_to':
+										if (!$this->Exp_unit_model->find(array('unit_code' => $data_value, 'trial_code' => $import_data[$cell_row]['trial_code']))){
+											array_push($messageErrors, "assigned_to, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+
+									default:
+										$import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+								}
+								break;
+							case 'Sample':
+								switch($header[$cell_column]) { //test sur le nom de colonne
+									case 'sample_code':
+										if ($this->Sample_model->find(array('sample_code' => $data_value))){
+											array_push($messageErrors, "sample_code, ligne ".$cell_row." feuille ".$worksheetname.", existe déjà dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									case 'unit_code':
+										if (!$this->Exp_unit_model->find(array('unit_code' => $data_value, 'trial_code' => $trial_code ))){
+											array_push($messageErrors, "Ensemble unit_code/Trial_code, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									case 'sample_entity_code':
+										if (!$this->Entity_model->find(array('entity_code' => $data_value))){
+											array_push($messageErrors, "sample_entity_code, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									case 'sample_stage_name':
+										if (!$this->Sample_stage_model->find(array('st_name' => $data_value, 'trial_code' => $trial_code))){
+											array_push($messageErrors, "Ensemble sample_stage_name/trial_code, ligne ".$cell_row." feuille ".$worksheetname.", n'existe pas dans la base");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$cell_column] = NULL;
+										}
+										else $import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+									case 'harvest_date':
+										if (strlen($data_value) == 10 ){
+											if (strpos($data_value,"/") !== FALSE)
+											{
+												$dateExploded = explode("/", $data_value);
+												$year = $dateExploded[2];
+												$month = $dateExploded[1];
+												$day = $dateExploded[0];
+											} else
+											{
+												$dateExploded = explode("-", $data_value);
+												$year = $dateExploded[0];
+												$month = $dateExploded[1];
+												$day = $dateExploded[2];
+											}
+
+											if (checkdate($month,$day,$year)){
+												$date = $year."-".$month."-".$day;
+												$import_data[$cell_row][$header[$cell_column]] = $date;
+											}
+											else {
+												array_push($messageErrors, "harvest_date, ligne ".$cell_row." n'existe pas dans le calendrier");
+												array_push($lineErrors, $cell_row);
+												$import_data[$cell_row][$header[$cell_column]] = NULL;
+											}
+										}
+										else {
+											array_push($messageErrors, "harvest_date, ligne ".$cell_row." n'existe pas dans le calendrier");
+											array_push($lineErrors, $cell_row);
+											$import_data[$cell_row][$header[$cell_column]] = NULL;
+										}
+										break;
+									default:
+										$import_data[$cell_row][$header[$cell_column]] = $data_value;
+										break;
+								}
+								break;
+						}
+					} elseif (isset($header[$cell_column])) {
+						switch ($worksheetname) {
+							case 'Sample_stage':
+								switch($header[$cell_column]) {
+									case 'trial_code':
+										array_push($messageErrors, "trial_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+									case 'st_name':
+										array_push($messageErrors, "st_name, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+								}
+								break;
+							case 'Entity':
+								if ($header[$cell_column] == 'entity_code'){
+									array_push($messageErrors, "entity_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+									array_push($lineErrors, $cell_row);
+								}
+								elseif ($header[$cell_column] == 'entity_name'){
+									array_push($messageErrors, "entity_name, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+									array_push($lineErrors, $cell_row);
+								}
+								break;
+							case 'Exp_unit':
+								switch($header[$cell_column]) {
+									case 'trial_code':
+										array_push($messageErrors, "trial_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+									case 'unit_code':
+										array_push($messageErrors, "unit_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+								}
+								break;
+							case 'Sample':
+								switch($header[$cell_column]) {
+									case 'sample_code':
+										array_push($messageErrors, "sample_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+									case 'unit_code':
+										array_push($messageErrors, "unit_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+									case 'sample_entity_code':
+										array_push($messageErrors, "sample_entity_code, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+
+									case 'sample_stage_name':
+										array_push($messageErrors, "sample_stage_name, ligne ".$cell_row." feuille ".$worksheetname.", absent");
+										array_push($lineErrors, $cell_row);
+										break;
+								}
+								break;
+						}
+						$import_data[$cell_row][$header[$cell_column]] = NULL;
+					}
+				}
+			}
+		}
+
+		$array_Line_Message_Data['lignesErrors'] = $lineErrors;
+		$array_Line_Message_Data['messageErrors'] = $messageErrors;
+		$array_Line_Message_Data['import_data'] = $import_data;
+
+		return $array_Line_Message_Data;
+
+	}
+
+	/**
+     * Affiche les echantillons recherchés sous forme de liste d'options (Format JSON)
+     */
+    public function searched_options()
+    {
+        $this->form_validation->set_rules('term', 'Terme recherché', 'trim|alpha_dash|required|max_length[255]|xss_clean');
+
+        if ($this->form_validation->run()) {
+            $searched_term = $this->input->post('term');
+            $results = $this->Sample_model->like($searched_term, 'sample_code');
+
+
+            $samples = array_map(function ($result) {
+                return array(
+                    'name' => $result['sample_code'],
+                    'value' => $result['sample_id']
+                );
+            }, $results);
+
+
+            echo json_encode($samples);
+        } else {
+            echo json_encode(array('type' => 'error', 'message' => form_error('term')));
+        }
+    }
+
+}
