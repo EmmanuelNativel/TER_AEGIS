@@ -13,6 +13,36 @@
   var data2 = { name: trialCode, children: [] };
 
   /*
+   *  Handler pour la selection des facteurs
+   */
+  /*
+  $("#unitExp_selectPicker").on("changed.bs.select", function(
+    e,
+    clickedIndex,
+    isSelected,
+    previousValue
+  ) {
+    var selected = $(this)
+      .find("option")
+      .eq(clickedIndex);
+    var selectedUnitId = selected.val();
+    var selectedUnitCode = selected.text();
+
+    utils.arrayToggleValue(selectedUnitExp, selectedUnitId);
+
+    //On maintient à jour la liste des unit_code disponibles pour pouvoir les afficher à tout moment (notamment dans le header)
+    if (!expUnitCodes.hasOwnProperty(selectedUnitId))
+      expUnitCodes[selectedUnitId] = selectedUnitCode;
+
+    //Lors de la séléction/désélection d'une unité expérimentale, on (re)charge les données d'observations
+    // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
+    var reloadData = true;
+    onChange(reloadData);
+  });
+  */
+
+
+  /*
    *  Handler pour la selection des unités expérimentales
    */
   $("#unitExp_selectPicker").on("changed.bs.select", function(
@@ -231,7 +261,7 @@
   /*
       Fonction pour (re)dessiner tous les élements du graphe
     */
-  //window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+  window.addEventListener("resize", redraw2); //listener pour redessiner lors du resize
 
   /*
   function redraw() {
@@ -712,7 +742,7 @@
 
   /**
    * ============================================================================================================
-   * PARTIE AJOUTÉE POUR LA CARTE ANNIMÉE *****
+   * PARTIE AJOUTÉE POUR LA CARTE ANNIMÉE ******
    * ============================================================================================================
    */
   
@@ -724,7 +754,7 @@
     $.ajax({
       url: SiteURL + "/Trials/ajaxLoadExpUnitData2/",
       data: {
-        trialCode: JSON.stringify(trialCode) //global var
+        trialCode: JSON.stringify("Matrice_Andrano_0304") //global var
       },
       type: "POST",
       dataType: "json",
@@ -761,7 +791,7 @@
 
     // On ajoute l'essai en racine de la hiérarchie
     data2 = {
-      name: trialCode, 
+      name: "Matrice_Andrano_0304", 
       children: hierarchy
     }
     //console.log(data2);
@@ -774,9 +804,22 @@
   function redraw2() {
     const div_id = "expUnitGraph";
 
+    //nettoyage du div
+    var globalDivEl = document.getElementById(div_id);
+    var globalDiv = d3.select(globalDivEl);
+    globalDiv.html("");
+
+    //Pas de données
+    if (data2.children.length == 0) {
+      globalDiv.html(
+        "<br><p> Aucune donnée pour cette unité expérimentale... </p>"
+      );
+      return;
+    }
+
     const margin = { top: 0, right: 0, bottom: 0, left: 0 };
-    const width = 800;
-    const height = 800;
+    const width = globalDivEl.offsetWidth * 0.7;
+    const height = globalDivEl.offsetWidth * 0.7;
 
     var svg = d3
       .select("#" + div_id)

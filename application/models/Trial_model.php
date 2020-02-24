@@ -205,7 +205,7 @@ class Trial_model extends MY_Model{
 
       $selectedFields = array(
         "obs_variable",  // la variable observée
-        "unit_id",       // id de l'unité (???)
+        "unit_id",       // id de l'expérience (exp_unit_id)
         "obs_date",      // date où la valeur a été relevée
         "obs_value",     // la valeur 
         "scale_code"     // l'unité de la valeur
@@ -256,28 +256,4 @@ class Trial_model extends MY_Model{
                       ->get()
                       ->result_array();
     }
-
-    // -> Récupérer les blocs ou trouver la bonne requête pour tout trouver direct ? 
-    // 2ième option meilleure (en fonction des facteurs sélectionnés)
-    public function get_trial_blocs($trial_code, $selectedFields=null) {
-      if ($selectedFields == null )
-        $selectedFields = array(
-          "e.exp_unit_id",
-          "e.unit_code",
-          "e.level_label",
-          "e.assigned_to"
-        );
-
-      return $this->db//->distinct()
-                      ->select($selectedFields)
-                      ->from("exp_unit e")
-                      ->where('e.trial_code', $trial_code)
-                      //->group_by('e.unit_code')
-                      ->order_by('e.unit_code')
-                      ->get()
-                      //->result_array();
-                      ->result();
-    }
-
-
 }
