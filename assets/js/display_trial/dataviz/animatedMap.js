@@ -91,7 +91,7 @@
       type: "POST",
       dataType: "json",
       success: function(response) {
-        data.children = response.expData; // data est une variable globale
+        //data.children = response.expData; // data est une variable globale
         prepareData(response.expData, response.expValues);
         //parseData();
         onSuccessCallback();
@@ -120,6 +120,8 @@
       }));
       return { ...d, values: valuesNeeded };
     });
+
+    //console.log("dataWithValues", dataWithValues);
 
     // A chaque bloc on y ajoute ses parcelles
     const hierarchy = parents.map(p => {
@@ -204,7 +206,7 @@
 
     var title_essais = root.data.name;
     var ex_path = root;
-    console.log("\n\n ROOT = ", root, "\n\n");
+    //console.log("\n\n ROOT = ", root, "\n\n");
 
     display(root.children);
 
@@ -234,7 +236,7 @@
 
       //fct click sur les rectangles
       square.on("click", (d, i) => {
-        console.log(`click on `, d.data.name);
+        //console.log(`click on `, d.data.name);
         //condition pour éviter de descendre plus bas que la feuille
         if (d.depth != 2) {
           ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
@@ -292,7 +294,7 @@
       function Value(d) {
         if (d.depth == 2) {
           svg1.selectAll("text").remove();
-          console.log("data =>", Object.keys(d.data).length);
+          //console.log("data =>", Object.keys(d.data).length);
           var i = 1;
           $.each(d.data, function(key, val) {
             //console.log(key + " : " + val);

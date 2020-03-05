@@ -276,7 +276,7 @@ class Trial_model extends MY_Model{
                     ->from("exp_unit e")
                     ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id ")
                     ->where("e.trial_code", $trial_code)
-                    ->where("e.level_label", "plot")
+                    ->where_in("e.level_label", array('plot', 'parcelle'))
                     ->where("ob.obs_variable", $obs_variable)
                     ->order_by("exp_unit_id", "ASC")
                     ->order_by("obs_date", "ASC")
