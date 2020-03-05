@@ -200,7 +200,7 @@ class Trials extends MY_Controller
                 // Données pour les selectPicker
                 $viewData['all_exp_unit'] = $this->Trial_model->get_trial_experimental_data(
                     $trial_code,
-                    $selectedFields=array("e.exp_unit_id",  "e.unit_code")
+                    $selectedFields=array("e.exp_unit_id",  "e.unit_code", "f.factor", "f.factor_id")
                 );
                 $viewData['all_variablesName'] = array_column($this->Obs_unit_model->get_trial_var($trial_code), 'obs_variable');
                 $ajaxData['datavizHtml'] = $this->load->view('trial/dataviz/animatedMap', $viewData, TRUE);
@@ -645,19 +645,25 @@ class Trials extends MY_Controller
         }
     }
 
-    //modèle envoi JSON
-    public function ajaxLoadExpUnitData2() {
+
+
+    /**
+     * Chargement des données pour la dataviz AnimatedMap
+     */
+    public function ajaxLoadDataForAnimatedMap() {
         $ajaxData = array(); //tableau qui sera retourné
         $trialCode =  json_decode($this->input->post('trialCode'));
-        //$ajaxData['trialCode'] = $trialCode;
-        //$selectedUnitExp =  json_decode($this->input->post('selectedUnitExp'));
-        //$selectedVariables = json_decode($this->input->post('selectedVariables'));
-        //$ajaxData['exp_unit_data'] = $this->Trial_model->get_exp_unit_data($selectedVariables, $selectedUnitExp);
+        $factors =  json_decode($this->input->post('factors'));
+        $obs_value =  json_decode($this->input->post('obs_value'));
 
-        //Récupération des données pour le dispositif expérimental
-        //$expData = $this->Trial_model->get_trial_hierarchy_data($trialCode);
-        $expData = $this->Trial_model->get_trial_hierarchy_data($trialCode);
+        // Récupération des valeurs de la variable à observer
+        if($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value);
+        else $expValues = [];
+
+        // Récupération de la hiérarchie (blocs/parcelles...)
+        $expData = $this->Trial_model->get_trial_hierarchy_data($trialCode, $factors);
         $ajaxData['expData'] = $expData;
+        $ajaxData['expValues'] = $expValues;
 
         echo json_encode($ajaxData);
     }

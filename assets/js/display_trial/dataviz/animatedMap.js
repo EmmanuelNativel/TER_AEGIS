@@ -1,22 +1,17 @@
 (function(d3) {
   /*============================================================================
-                   Code d3js pour le multi graph des unités expérimentales
-    =============================================================================*/
-
-  //var data = []; //variable locale à ce fichier qui va contenir les données
-  var selectedUnitExp = [];
-  var expUnitCodes = {};
-  var selectedVariables = [];
-  var selectedGraphHeight = $("#size_selectPicker :selected").val();
+                     Code d3js pour le multi graph des unités expérimentales
+      =============================================================================*/
+  //var selectedGraphHeight = $("#size_selectPicker :selected").val();
   var trialCode = $("#dataviz").attr("trial_code"); // Récupère le code de l'essai courant
+  var data = { name: trialCode, children: [] }; //variable locale à ce fichier qui va contenir les données
+  let selectedFactors = []; //Liste des facteurs
+  let selectedVariable = null; // Valeur à observer
 
-  var data2 = { name: trialCode, children: [] };
-
-  /*
+  /**
    *  Handler pour la selection des facteurs
    */
-  /*
-  $("#unitExp_selectPicker").on("changed.bs.select", function(
+  $("#factor_selectPicker").on("changed.bs.select", function(
     e,
     clickedIndex,
     isSelected,
@@ -25,54 +20,21 @@
     var selected = $(this)
       .find("option")
       .eq(clickedIndex);
-    var selectedUnitId = selected.val();
-    var selectedUnitCode = selected.text();
+    //var selectedFactorId = selected.val();
+    var selecFactor = selected.text();
 
-    utils.arrayToggleValue(selectedUnitExp, selectedUnitId);
+    utils.arrayToggleValue(selectedFactors, selecFactor);
 
-    //On maintient à jour la liste des unit_code disponibles pour pouvoir les afficher à tout moment (notamment dans le header)
-    if (!expUnitCodes.hasOwnProperty(selectedUnitId))
-      expUnitCodes[selectedUnitId] = selectedUnitCode;
-
-    //Lors de la séléction/désélection d'une unité expérimentale, on (re)charge les données d'observations
-    // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-    var reloadData = true;
-    onChange(reloadData);
-  });
-  */
-
-
-  /*
-   *  Handler pour la selection des unités expérimentales
-   */
-  $("#unitExp_selectPicker").on("changed.bs.select", function(
-    e,
-    clickedIndex,
-    isSelected,
-    previousValue
-  ) {
-    var selected = $(this)
-      .find("option")
-      .eq(clickedIndex);
-    var selectedUnitId = selected.val();
-    var selectedUnitCode = selected.text();
-
-    utils.arrayToggleValue(selectedUnitExp, selectedUnitId);
-
-    //On maintient à jour la liste des unit_code disponibles pour pouvoir les afficher à tout moment (notamment dans le header)
-    if (!expUnitCodes.hasOwnProperty(selectedUnitId))
-      expUnitCodes[selectedUnitId] = selectedUnitCode;
-
-    //Lors de la séléction/désélection d'une unité expérimentale, on (re)charge les données d'observations
+    //Lors de la séléction/désélection d'un facteur, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
     var reloadData = true;
     onChange(reloadData);
   });
 
   /*
-   *  Handler pour la selection des variables observées
+   *  Handler pour la selection de la variable à observer
    */
-  $("#variables_selectPicker").on("changed.bs.select", function(
+  $("#variable_selectPicker").on("changed.bs.select", function(
     e,
     clickedIndex,
     isSelected,
@@ -82,687 +44,55 @@
       .find("option")
       .eq(clickedIndex)
       .val();
-
-    utils.arrayToggleValue(selectedVariables, selectedValue);
-
+    selectedVariable = selectedValue;
     //Lors de la séléction/désélection d'une variable, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
     var reloadData = true;
     onChange(reloadData);
   });
 
-  /*
-   *  Handler pour la selection de la taille du graphique
-   */
-  $("#size_selectPicker").on("changed.bs.select", function(
-    e,
-    clickedIndex,
-    isSelected,
-    previousValue
-  ) {
-    var selectedValue = $(this)
-      .find("option")
-      .eq(clickedIndex)
-      .val();
-    selectedGraphHeight = selectedValue;
-
-    //Lors du changement de taille de graphique, on se contente de redessiner le graph
-    var reloadData = false;
-    onChange(reloadData);
-  });
-
-  /*
+  /**
    * Fonction appelée à chaque changement de paramètres
    */
   function onChange(reloadData) {
-    //Si pas d'unités expérimentales séléctionnées
-    if (selectedUnitExp.length == 0) {
+    if (selectedFactors.length === 0) {
       cleanAllDiv();
       $("#expUnitGraph").html(
-        "<br><p> Veuillez sélectionner au moins une unité expérimentale... </p>"
+        "<br><p> Veuillez sélectionner au moins un facteur... </p>"
       );
-    }
-    //Si pas de variables séléctionnées
-    else if (selectedVariables.length == 0) {
-      cleanAllDiv();
-      $("#expUnitGraph").html(
-        "<br><p> Veuillez sélectionner au moins une variable... </p>"
-      );
-    } else {
-      //if (reloadData) loadExpUnitData(() => redraw()); else redraw(); // --> ANCIENNE VERSION
-      if (reloadData) loadHierarchyData(() => redraw2()); // --> C'est ici qu'on affiche la dataviz
-      else redraw2();
-    }
+    } else if (reloadData) {
+      loadData(() => redraw());
+    } else redraw();
   }
 
-  /*
-      Fonction ajax permettant de charger les données d'observations pour toutes
-      les unités expérimentales et les variables choisies
-      (en utilisant les paramètres globaux) et de redessiner le tout.
-    */
-  /*
-  function loadExpUnitData(onSuccessCallback) {
-    $.ajax({
-      url: SiteURL + "/Trials/ajaxLoadExpUnitData/",
-      data: {
-        selectedUnitExp: JSON.stringify(selectedUnitExp), //global var
-        selectedVariables: JSON.stringify(selectedVariables) //global var
-      },
-      type: "POST",
-      dataType: "json",
-      success: function(response) {
-        data = response.exp_unit_data; //set global var data
-        console.log("data test -> ", data);
-        parseData();
-        onSuccessCallback();
-      }
-    });
-  }
-  */
-
-  /*
-      Fonction pour parser les données après les avoir récupérées
-      (utilise la variable locale 'data')
-    */
-  /*
-  function parseData() {
-    var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
-
-    data.forEach(function(d) {
-      d.obs_value = +d.obs_value;
-      d.obs_date = parseDate(d.obs_date);
-    });
-  }
-  */
-
-  /*
-      Fonction pour dessiner le header du graphique (noms des unités expérimentales + couleur)
-    */
-  /*
-  function drawHeader() {
-    //nettoyage du div
-    var headerDivEl = document.getElementById("expUnitGraph_header");
-    var headerDiv = d3.select(headerDivEl);
-    headerDiv.html("");
-
-    //Taille du header
-    var margin = { top: 30, right: 20, bottom: 10, left: 30 },
-      width = headerDivEl.clientWidth - margin.left - margin.right;
-    height = 20;
-
-    // Création de couleurs variables
-    var myColor = d3
-      .scaleOrdinal()
-      .domain(selectedUnitExp)
-      .range(utils.colorArray);
-
-    var svg = headerDiv
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom);
-
-    var g = svg
-      .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-    //Ajout des noms des unités expérimentales en positionnant de manière intelligente
-    // + passage à la ligne automatique
-
-    var offsetX = 0;
-    var offsetY = 0;
-    var legendBlockWidth = 15;
-    var verticalMargin = 5;
-    var oneLineHeight = legendBlockWidth + verticalMargin;
-    var textMargin = 5;
-
-    g.selectAll(".legend")
-      .data(selectedUnitExp)
-      .enter()
-      .append("g")
-      .attr("class", "legend")
-      .each(function(key, i) {
-        var item = d3.select(this);
-
-        var text = item
-          .append("text")
-          .attr(
-            "transform",
-            `translate(${legendBlockWidth + textMargin},${legendBlockWidth})`
-          )
-          .text(expUnitCodes[key]);
-
-        item
-          .append("rect")
-          .attr("width", legendBlockWidth)
-          .attr("height", legendBlockWidth)
-          .style("fill", myColor(key));
-
-        // Positionnement du groupe texte + couleur
-        item.attr("transform", `translate(${offsetX} , ${offsetY})`);
-
-        // Si l'offsetX est dépassé on passe à une nouvelle ligne en redéplaçant le dernier item sur la nouvelle ligne
-        var newItemWidth = item.node().getBBox().width;
-        if (offsetX + newItemWidth <= width) {
-          offsetX += newItemWidth + textMargin;
-        } else {
-          offsetY += oneLineHeight;
-          item.attr("transform", `translate(0 , ${offsetY})`); //repositionnement sur la nouvelle ligne
-          offsetX = newItemWidth + textMargin;
-        }
-      });
-
-    //Augmente la taille du svg à chaque nouvelle ligne
-    var totalHeight = oneLineHeight + offsetY; // hauteur 1ere ligne + décalage Y
-    if (totalHeight > height)
-      svg.attr("height", totalHeight + margin.top + margin.bottom);
-  }
-  */
-
-  /*
-      Fonction pour (re)dessiner tous les élements du graphe
-    */
-  window.addEventListener("resize", redraw2); //listener pour redessiner lors du resize
-
-  /*
-  function redraw() {
-    drawHeader();
-
-    //nettoyage du div
-    var globalDivEl = document.getElementById("expUnitGraph");
-    var globalDiv = d3.select(globalDivEl);
-    globalDiv.html("");
-
-    //Pas de données
-    if (data.length == 0) {
-      globalDiv.html(
-        "<br><p> Aucune donnée pour cette unité expérimentale... </p>"
-      );
-      return;
-    }
-
-    var margin = { top: 10, right: 250, bottom: 20, left: 30 },
-      width = globalDivEl.clientWidth - margin.left - margin.right,
-      height = selectedGraphHeight - margin.top - margin.bottom;
-
-    var xScale = d3.scaleTime().range([0, width]);
-
-    var yScales = []; //tableau qui contiendra un yScale différent pour chaque variable
-
-    var area = yScale =>
-      d3
-        .area()
-        .x(function(d) {
-          return xScale(d.obs_date);
-        })
-        .y0(height)
-        .y1(function(d) {
-          return yScale(d.obs_value);
-        });
-
-    var line = yScale =>
-      d3
-        .line()
-        .x(function(d) {
-          return xScale(d.obs_date);
-        })
-        .y(function(d) {
-          return yScale(d.obs_value);
-        });
-
-    // Nest data => regroupe les données par variable dans un premier temps
-    var variablesData = d3
-      .nest()
-      .key(function(d) {
-        return d.obs_variable;
-      })
-      .entries(data);
-
-    // yScales : Calcul des valeurs maximales pour chaque variables afin de construire les yScales
-    variablesData.forEach(function(s) {
-      var maxValue = d3.max(s.values, d => d.obs_value);
-      yScales.push(
-        d3
-          .scaleLinear()
-          .range([height, 0])
-          .domain([0, maxValue])
-      );
-    });
-    //console.log(variablesData);
-
-    // xScale : Calcul des dates minimale et maximale de l'essai afin de calculer le xScale global
-    xScale.domain([
-      d3.min(variablesData, function(s) {
-        var beginDate = d3.min(s.values, d => d.obs_date);
-        return d3.timeMonth.offset(beginDate, -2); //le graphique commencera 2 mois avant la première mesure
-      }),
-      d3.max(variablesData, function(s) {
-        var endDate = d3.max(s.values, d => d.obs_date);
-        return d3.timeDay.offset(endDate, 5);
-      })
-    ]);
-
-    //Après avoir calculé les x et y scales on nest par variable ET par exp_unit_id
-    variablesData = d3
-      .nest()
-      .key(function(d) {
-        return d.obs_variable;
-      })
-      .key(function(d) {
-        return d.unit_id;
-      })
-      .entries(data);
-
-    // Création de couleurs variables pour chaque unité expérimentale
-    var myColor = d3
-      .scaleOrdinal()
-      .domain(selectedUnitExp)
-      .range(utils.colorArray);
-
-    // Ajout d'un svg par variable qui contiendra un graphique
-    svg = globalDiv
-      .selectAll("svg")
-      .data(variablesData)
-      .enter()
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-    // Ajout des courbes
-    svg.each(function(d, i) {
-      d3.select(this)
-        .selectAll(".line")
-        .data(d.values)
-        .enter()
-        .append("path")
-        .attr("class", "line")
-        .attr("d", function(d1, i1) {
-          return line(yScales[i])(d1.values);
-        })
-        .style("stroke", function(d1, i1) {
-          return myColor(d1.key);
-        });
-    });
-
-    // Ajout des points effectivement mesurés sur les lignes
-    var circleRadius = 3;
-    svg.each(function(d, i) {
-      var svg = this;
-      d3.select(svg)
-        .selectAll(".line")
-        .each(function(d1, i1) {
-          d3.select(svg)
-            .selectAll("myCircles")
-            .data(d1.values)
-            .enter()
-            .append("circle")
-            .attr("class", "circle")
-            .attr("cx", function(d2) {
-              return xScale(d2.obs_date);
-            })
-            .attr("cy", function(d2) {
-              return yScales[i](d2.obs_value);
-            })
-            .attr("r", circleRadius)
-            .style("stroke", function(d2) {
-              return myColor(d1.key);
-            });
-        });
-    });
-
-    // Ajout d'un focusCircle par courbe
-    // (rond rouge qui apparaitra quand notre curseur sera sur une valeur effectivement mesurée)
-    svg.each(function(d, i) {
-      var svg = this;
-      d3.select(svg)
-        .selectAll(".line")
-        .each(function(d1, i1) {
-          d3.select(svg)
-            .append("circle")
-            .attr("class", "circle focusCircle")
-            .attr("r", 2 * circleRadius)
-            .style("display", "none");
-        });
-    });
-
-    // Ajout d'indications à droite du graphique en fonction de la position du curseur
-
-    var boxWidth = 0.75 * margin.right; //en pixel
-    var boxHeight = height + 0.8 * margin.bottom; //en pixel
-
-    var indicatorsBox = svg
-      .append("g")
-      .attr("transform", `translate(${width + margin.left + 10}, 0 )`);
-
-    //background box
-    indicatorsBox
-      .append("rect")
-      .attr("class", "indicatorsBox")
-      .attr("width", boxWidth)
-      .attr("height", boxHeight);
-
-    var dateLabel = indicatorsBox
-      .append("text")
-      .attr("class", "indicatorDate")
-      .attr("text-anchor", "middle")
-      .attr("x", 0.5 * boxWidth)
-      .attr("y", boxHeight - 10);
-
-    var valueFontSize = 13; //px
-    var smallRectSize = 0.8 * valueFontSize;
-
-    //Ajout d'un 'g' pour chaque petit carré et son value_label dans l'indicatorBox
-    var valueContainer = indicatorsBox
-      .selectAll(".valueContainer")
-      .data(function(d) {
-        return d.values;
-      })
-      .enter()
-      .append("g");
-
-    var smallColorRect = valueContainer
-      .append("rect")
-      .attr("width", smallRectSize)
-      .attr("height", smallRectSize)
-      .style("fill", function(d) {
-        return myColor(d.key);
-      })
-      .append("title")
-      .text(function(d) {
-        return expUnitCodes[d.key];
-      });
-
-    //Ajout d'un label qui affichera la valeur pour chaque petit carré
-    var valueLabel = valueContainer
-      .append("text")
-      .attr("class", "valueLabel")
-      .attr("x", 1.2 * smallRectSize)
-      .attr("y", 0.5 * valueFontSize)
-      .style("font-size", valueFontSize + "px")
-      .text("-");
-
-    var valueLabelWidth = 0.3 * boxWidth; //utilisé plus tard pour "wrappé" le texte
-
-    //Positionnement intelligent des valueContainer
-
-    var maxNbValPerColumn = Math.floor(
-      (boxHeight - 30) / (1.2 * valueFontSize)
-    ); //hauteur disponible divisé par hauteur d'une ligne
-    var maxColNumber = 2;
-
-    valueContainer.each(function(d, i) {
-      var colNumber = Math.floor(i / maxNbValPerColumn);
-      var lineNumber = i % maxNbValPerColumn;
-
-      if (colNumber + 1 <= maxColNumber) {
-        var thisValueContainer = d3
-          .select(this)
-          .attr(
-            "transform",
-            `translate(${0.05 * boxWidth + colNumber * (0.45 * boxWidth)}, ${7 +
-              lineNumber * (1.2 * valueFontSize)} )`
-          );
-
-        if (
-          colNumber == maxColNumber - 1 &&
-          lineNumber == maxNbValPerColumn - 1
-        ) {
-          thisValueContainer.selectAll("*").remove();
-
-          //Si plus d'espace disponible on affiche un petit point d'interrogation avec une indication
-          thisValueContainer
-            .append("foreignObject")
-            .attr("width", "200px")
-            .attr("height", "200px")
-            .attr("x", 0 * smallRectSize)
-            .attr("y", 0 * valueFontSize)
-            .append("xhtml:div")
-            .style("font-size", valueFontSize + "px")
-            .html(`<button type="button" class="btn btn-default valueHelpBtn" data-container="body"
-                                data-toggle="tooltip" data-placement="right"
-                                title="Valeur(s) cachée(s). Veuillez augmenter la taille des graphiques.">
-                                  <span>?</span>
-                               </button>`);
-
-          $('[data-toggle="tooltip"]').tooltip();
-        }
-      } else {
-        d3.select(this).attr("visibility", "hidden");
-      }
-    });
-
-    // Ajout d'un label indiquant le nom de la variable à gauche du graphique
-    var variableLabelG = svg
-      .append("g")
-      .attr("transform", `translate(${6}, ${height - 6})`);
-    var variableLabel = variableLabelG
-      .append("text")
-      .attr("class", "variableLabelContainer");
-
-    //Ajout du label de la variable
-    variableLabel
-      .append("tspan")
-      .text(function(d) {
-        return d.key;
-      })
-      .attr("class", "variableLabel");
-
-    //Ajout de l'unité entre parenthèses (qui se trouve dans chaque observation, on prend donc la première observation de la première variable)
-    variableLabel
-      .append("tspan")
-      .text(function(d) {
-        return ` (${d.values[0].values[0].scale_code})`;
-      })
-      .attr("class", "variableScaleCode");
-
-    //Ajout d'un background semi transparent pour que le nom et l'unité restent visibles même s'il y a les courbes à l'arrière
-    variableLabelG.each(function(d) {
-      var bbox = this.getBBox();
-      d3.select(this)
-        .insert("rect", "text")
-        .attr("x", bbox.x)
-        .attr("y", bbox.y)
-        .attr("width", bbox.width)
-        .attr("height", bbox.height)
-        .style("fill", "white")
-        .style("opacity", "0.8");
-    });
-
-    //Ajout des axes x et y
-    var y = svg
-      .append("g")
-      .each(function(d, i) {
-        d3.select(this).call(
-          d3.axisRight(yScales[i]).ticks(Math.floor(selectedGraphHeight / 30))
-        );
-      })
-      .attr("transform", `translate(${width},0)`);
-
-    var x = svg
-      .append("g")
-      .call(d3.axisBottom(xScale).tickFormat(utils.multiFormat))
-      .attr("transform", `translate(0,${height})`);
-
-    // ------------------- Gestion de l'interactivité ------------------------
-
-    //Idée : Récupération de la position du globalDiv puis ajout d'un overlayBox
-    //en position absolue qui capturera les mouvements de souris
-
-    var globalDivPos = d3
-      .select("#expUnitGraph")
-      .node()
-      .getBoundingClientRect();
-
-    var overlayBox = globalDiv
-      .append("svg")
-      .attr("id", "verticalLineContainer")
-      .style("top", globalDivPos.top + window.scrollY + "px")
-      .style("left", globalDivPos.left + margin.left + window.scrollX + "px")
-      .style("width", width + "px")
-      .style("height", globalDivPos.height - margin.top + "px");
-
-    ///Ajout d'une ligne verticale permettant de parcourir les graphiques
-    var lineIndicator = overlayBox
-      .append("line")
-      .attr("id", "verticalLine")
-      .attr("x1", globalDivPos.x)
-      .attr("y1", 0)
-      .attr("x2", globalDivPos.x)
-      .attr("y2", globalDivPos.height);
-
-    // Gestion du mouvement de la souris
-
-    var formatTime = d3.timeFormat("%d %b %Y");
-    var bisectDate = d3.bisector(function(d) {
-      return d.obs_date;
-    }).left;
-    var catchDistance = 5; //px;
-
-    overlayBox
-      .append("rect")
-      .attr("id", "mouseRectangle")
-      .attr("width", "100%")
-      .attr("height", "100%")
-      .on("mouseover", function() {
-        lineIndicator.style("display", null);
-      })
-      .on("mouseout", function() {
-        lineIndicator.style("display", "none");
-      })
-      .on("mousemove", function() {
-        var mouse = d3.mouse(this);
-
-        //Bouge la ligne verticale
-        lineIndicator.attr("x1", mouse[0]).attr("x2", mouse[0]);
-
-        //affichage de la date dans le cadran
-        var mouseDate = xScale.invert(mouse[0]);
-        dateLabel.text(formatTime(mouseDate));
-
-        // On parcours chaque graphique, et pour chaque graphique on va afficher
-        // les bonnes valeurs à droite et aussi on va afficher les cercles rouges ou non
-        // en fonction de la position de la barre verticale.
-        svg.each(function(d, i) {
-          var linesValues = []; //le valueLabel à afficher pour chaque ligne
-          var focusPoints = []; //Les coordonnées du focus circle pour chaque ligne
-
-          d3.select(this)
-            .selectAll(".line")
-            .each(function(d1, i1) {
-              var currentLine = this;
-
-              //idée: pour chaque graphique on regarde si notre ligne verticale
-              // se trouve sur une valeur effectivement mesurée. Si c'est le cas alors
-              //on affiche la vraie valeur en surlignant le cercle en rouge,
-              //sinon on affiche la valeur "interpolée"
-
-              var idx = bisectDate(d1.values, mouseDate); //calcul de l'indice où la date du curseur serait potentiellement ajouté
-              //cela permet de récupérer l'élement précédent et le suivant
-
-              var leftVal = d1.values[Math.max(0, idx - 1)],
-                leftValX = xScale(leftVal.obs_date);
-
-              var rightVal = d1.values[Math.min(idx, d1.values.length - 1)],
-                rightValX = xScale(rightVal.obs_date);
-
-              //Calcul des distances par rapport aux points à gauche et à droite, ainsi on pourra
-              //savoir quel point surligner en rouge s'il est assez près
-              var mouseDistLeft = Math.abs(leftValX - mouse[0]),
-                mouseDistRight = Math.abs(rightValX - mouse[0]);
-
-              if (
-                mouseDistLeft <= catchDistance &&
-                mouseDistLeft <= mouseDistRight
-              ) {
-                //Le point à gauche doit être surligné
-                linesValues[i1] = leftVal.obs_value;
-                focusPoints[i1] = {
-                  x: leftValX,
-                  y: yScales[i](leftVal.obs_value)
-                };
-                lineIndicator.attr("x1", leftValX).attr("x2", leftValX);
-                dateLabel.text(formatTime(leftVal.obs_date));
-              } else if (
-                mouseDistRight <= catchDistance &&
-                mouseDistRight <= mouseDistLeft
-              ) {
-                //Le point à droite doit être surligné
-                linesValues[i1] = rightVal.obs_value;
-                focusPoints[i1] = {
-                  x: rightValX,
-                  y: yScales[i](rightVal.obs_value)
-                };
-                lineIndicator.attr("x1", rightValX).attr("x2", rightValX);
-                dateLabel.text(formatTime(rightVal.obs_date));
-              } else {
-                //Une valeur interpolée doit être calculée
-                var point = utils.getPointAtX(currentLine, mouse[0]);
-                linesValues[i1] =
-                  point != null ? yScales[i].invert(point.y) : "-";
-                focusPoints[i1] = null;
-              }
-            });
-
-          //Grâce au tableau focusPoints, on a les coordonnées des focusCircles à afficher
-          d3.select(this)
-            .selectAll(".focusCircle")
-            .attr("cx", function(d1, i1) {
-              return focusPoints[i1] != null ? focusPoints[i1].x : 0;
-            })
-            .attr("cy", function(d1, i1) {
-              return focusPoints[i1] != null ? focusPoints[i1].y : 0;
-            })
-            .style("display", function(d1, i1) {
-              return focusPoints[i1] != null ? null : "none";
-            });
-
-          //Grâce au linesValues on peut désormais afficher la bonne valeur pour la bonne courbe
-          d3.select(this)
-            .selectAll(".valueLabel")
-            .text(function(d1, i1) {
-              return linesValues[i1];
-            })
-            .each(function(d1, i1) {
-              //Après avoir set la value on coupe le texte à la bonne taille sinon ne pourra pas tenir sur 2 colonnes
-              var self = d3.select(this);
-              self.text(utils.getWrappedText(self, valueLabelWidth));
-            });
-        });
-      });
-  } //end redraw()
-  */
-
+  // On redessine la dataviz quand on redimensionne la fenêtre
+  window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+
+  /**
+   * Efface tout
+   */
   function cleanAllDiv() {
     $("#expUnitGraph").html("");
     $("#expUnitGraph_header").html("");
   }
 
-
-
   /**
-   * ============================================================================================================
-   * PARTIE AJOUTÉE POUR LA CARTE ANNIMÉE ******
-   * ============================================================================================================
+   * Fonction ajax permettant de charger les données pour construire l'arbre (blocs et parcelles associées)
    */
-  
-
-  /*
-      Fonction ajax permettant de charger les données pour construire l'arbre (blocs et parcelles associées)
-    */
-  function loadHierarchyData(onSuccessCallback) {
+  function loadData(onSuccessCallback) {
     $.ajax({
-      url: SiteURL + "/Trials/ajaxLoadExpUnitData2/",
+      url: SiteURL + "/Trials/ajaxLoadDataForAnimatedMap/",
       data: {
-        trialCode: JSON.stringify("Matrice_Andrano_0304") //global var
+        //trialCode: JSON.stringify("Matrice_Andrano_0304"),
+        trialCode: JSON.stringify(trialCode), //global var
+        factors: JSON.stringify(selectedFactors),
+        obs_value: JSON.stringify(selectedVariable)
       },
       type: "POST",
       dataType: "json",
       success: function(response) {
-        //data = response.exp_unit_data; //set global var data
-        console.log("data1 -> ", response);
-        data2.children = response.expData;
-        prepareData();
+        data.children = response.expData; // data est une variable globale
+        prepareData(response.expData, response.expValues);
         //parseData();
         onSuccessCallback();
       }
@@ -770,79 +100,111 @@
   }
 
   /**
-   * Fonction permettant de structurer les données sous forme hiérarchique
+   * Mise en forme des données pour qu'elles soient utilisables par la dataviz
+   * Effet de bord : Insertion des données dans la variable globale data
    */
-
-  function prepareData() {
-    const initialData = data2.children; // data2 -> variable globale
-
+  function prepareData(dataExp, values) {
     // Récupère les parents (les blocs)
     const reducer = (accumulator, currentValue) =>
       accumulator.add(currentValue.parent_unit_code);
-    const parents = Array.from(initialData.reduce(reducer, new Set()));
+    const parents = Array.from(dataExp.reduce(reducer, new Set()));
+
+    // Insertion des valeurs et de leurs dates dans chaque parcelle
+    const dataWithValues = dataExp.map(d => {
+      const valuesChildren = values.filter(
+        child => child.exp_unit_id === d.exp_unit_id
+      );
+      const valuesNeeded = valuesChildren.map(v => ({
+        date: v.date,
+        value: v.value
+      }));
+      return { ...d, values: valuesNeeded };
+    });
 
     // A chaque bloc on y ajoute ses parcelles
     const hierarchy = parents.map(p => {
       return {
         name: p,
-        children: initialData.filter(d => d.parent_unit_code === p)
+        children: dataWithValues.filter(d => d.parent_unit_code === p)
       };
     });
 
     // On ajoute l'essai en racine de la hiérarchie
-    data2 = {
-      name: "Matrice_Andrano_0304", 
+    data = {
+      //name: "Matrice_Andrano_0304",
+      name: trialCode,
       children: hierarchy
-    }
-    //console.log(data2);
+    };
+    console.log("data", data);
   }
 
   /**
-   * Fonction qui permet d'afficher la visualisation
-   * TODO: Revoir la taille et le redimensionnement. S'inspirer des Xscale et Yscale utilisés par le gars d'avant ?
+   * TODO:
+   *
+   * Faire le Zoom => Modifier la structure de code ? >>> Plus simple a visualiser
+   * Améliorer l'affichage des données
+   * Afficher le chemin actuelle dans le pass => creer une fct click pour les parcelles
+   *
    */
-  function redraw2() {
-    const div_id = "expUnitGraph";
 
-    //nettoyage du div
-    var globalDivEl = document.getElementById(div_id);
+  function redraw() {
+    //on supprime les svg avant de réafficher
+    var globalDivEl = document.getElementById("expUnitGraph");
     var globalDiv = d3.select(globalDivEl);
     globalDiv.html("");
 
-    //Pas de données
-    if (data2.children.length == 0) {
-      globalDiv.html(
-        "<br><p> Aucune donnée pour cette unité expérimentale... </p>"
-      );
-      return;
-    }
+    var divBlocs = document.createElement("div");
+    divBlocs.id = "BlocAnimation";
+
+    globalDivEl.appendChild(divBlocs);
+
+    const div_id = "expUnitGraph";
+    const taill_coef = 2 / 3;
+    var agr = 0.8;
+    const cote = document.getElementById(div_id).clientWidth * taill_coef * agr;
+
+    const taill_coef_info = 1 / 3;
+    const cote_info =
+      document.getElementById(div_id).clientWidth * taill_coef_info * agr - 20;
 
     const margin = { top: 0, right: 0, bottom: 0, left: 0 };
-    const width = globalDivEl.offsetWidth * 0.7;
-    const height = globalDivEl.offsetWidth * 0.7;
+    const width = cote;
+    const height = cote;
 
+    //On ajoute un svg a la div
     var svg = d3
-      .select("#" + div_id)
+      .select("#" + divBlocs.id)
       .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.bottom + margin.top)
-      .style("border", "1px solid #000")
+      .attr("width", width + margin.left + margin.right + 5)
+      .attr("height", height + margin.bottom + margin.top + 50)
+      .style("border", "1px solid red")
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    const pack = data =>
+    var svg1 = d3
+      .select("#" + divBlocs.id)
+      .append("svg")
+      .attr("x", 100)
+      .attr("width", cote_info)
+      .attr("height", height + 50)
+      .style("border", "1px solid blue");
+
+    //Modification des données pour être plus simple a les traité
+    const pack = d =>
       d3
         .pack()
         .size([width, height])
         .padding(2)(
-        d3.hierarchy(data)
+        d3.hierarchy(d)
         //.sum(d => d.value)
         //.sort((a, b) => b.value - a.value)
       );
 
-    const root = pack(data2);
-    //console.log("data", data2);
-    //console.log("root", root);
+    const root = pack(data);
+
+    var title_essais = root.data.name;
+    var ex_path = root;
+    console.log("\n\n ROOT = ", root, "\n\n");
 
     display(root.children);
 
@@ -853,34 +215,111 @@
       const rectHeight = height / maxRectInLine;
       const rectPadding = 2;
 
-      svg
+      //var qui contient la svg qui gères l'affichage des parcelles
+      var square = svg
         .selectAll("rect")
         .data(currentSelection)
         .enter()
         .append("rect")
+        //.text(function(d) {return d.data.name})
         .attr("x", (d, i) => {
-          return (i % maxRectInLine) * rectWidth;
+          return (i % maxRectInLine) * rectWidth + 1;
         })
         .attr("y", (d, i) => {
-          return Math.trunc(i / maxRectInLine) * rectHeight;
+          return Math.trunc(i / maxRectInLine) * rectHeight + 45;
         })
         .attr("width", rectWidth - rectPadding)
         .attr("height", rectHeight - rectPadding)
-        .attr("fill", "#666666")
-        .on("click", (d, i) => {
-          console.log(`click on ${i}`);
-          console.log("data", d);
-          resetDisplay(); // reset de l'affichage
-          display(root.children[i].children); // Affichage des enfants du noeud choisi
+        .attr("fill", "green");
+
+      //fct click sur les rectangles
+      square.on("click", (d, i) => {
+        console.log(`click on `, d.data.name);
+        //condition pour éviter de descendre plus bas que la feuille
+        if (d.depth != 2) {
+          ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
+          //printPass(d)// Ne fonctionne pas dans cette fonction
+          resetDisplay();
+          display(d.children); //affiche les enfants
+        } else {
+          //console.log("append text");
+          //svg1.selectAll("text").remove()
+          Value(d);
+        }
+      });
+
+      //function hoverClick sur les parcelles
+      square.on("mouseover", handleMouseOver);
+
+      //SVG qui permet de faire le retour
+      var pass = svg.append("g").attr("class", "ClassforText");
+
+      //ajoute un rectangle
+      pass
+        .append("rect")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", 40)
+        .attr("fill", "lightgrey");
+
+      pass
+        .append("text")
+        .attr("x", 6)
+        .attr("y", 6 - margin.top)
+        .attr("dy", ".75em")
+        //.text("Back <==")
+        .text(() => {
+          return "<== ";
         });
 
-        /**
-         * Reset l'affichage du dataviz pour pourvoir afficher les enfants
-         */
+      //On ajoute une fct Onclick sur le le svg pass
+      pass.on("click", () => {
+        if (ex_path.depth != 1) {
+          resetDisplay();
+          pass.select("text").text("<==");
+          resetDisplay();
+          display(ex_path.children); // retourne au parent
+        }
+      });
+
+      //reset de l'affichage pour afficher les éléments
       function resetDisplay() {
         svg.selectAll("rect").remove();
+        svg1.selectAll("text").remove();
+        //pass.select("text").text("data")
+      }
+
+      //Affiche les données sur dans le svg info
+      function Value(d) {
+        if (d.depth == 2) {
+          svg1.selectAll("text").remove();
+          console.log("data =>", Object.keys(d.data).length);
+          var i = 1;
+          $.each(d.data, function(key, val) {
+            //console.log(key + " : " + val);
+            svg1
+              .append("text")
+              .attr("x", 20)
+              .attr("y", i * 30)
+              .text(val);
+            i++;
+          });
+        }
+      }
+
+      //affiche le nom de la données dans le svg pass
+      function printPass(d) {
+        pass.select("text").text(d.data.name);
+      }
+
+      //function hoverclick
+      function handleMouseOver(d, i) {
+        //d et i pour des futures modifications
+        /**Idée de function :
+         * affiche les donneés de la parcelles (+horizons)
+         * affiche les logos liées au données
+         */
+        printPass(d);
       }
     }
   }
-
 })(d3); //end of this file
