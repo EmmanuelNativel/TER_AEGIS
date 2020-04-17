@@ -1,18 +1,11 @@
 (function (d3) {
-  /*============================================================================
-                     Code d3js pour le multi graph des unités expérimentales
-      =============================================================================*/
-  //var selectedGraphHeight = $("#size_selectPicker :selected").val();
   var trialCode = $("#dataviz").attr("trial_code"); // Récupère le code de l'essai courant
   var data = { name: trialCode, children: [] }; //variable locale à ce fichier qui va contenir les données
   let selectedFactors = []; //Liste des facteurs
   let selectedVariable = null; // Valeur à observer
-  let date = null;
-  let svgAnimation = null;
-  let svgInfo = null;
-  let pathElement = null;
 
-  drawSlider();
+  // On redessine la dataviz quand on redimensionne la fenêtre
+  window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
 
   /**
    *  Handler pour la selection des facteurs
@@ -64,9 +57,6 @@
       loadData(() => redraw());
     } else redraw();
   }
-
-  // On redessine la dataviz quand on redimensionne la fenêtre
-  window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
 
   /**
    * Efface tout
@@ -140,24 +130,17 @@
     console.log("data", data);
   }
 
-  function resetDisplay() {
-    svgAnimation.selectAll("rect").remove();
-    svgInfo.selectAll("text").remove();
-    //pass.select("text").text("data")
-  }
-
   function redraw() {
-    //on supprime les svg avant de réafficher
     var globalDivEl = document.getElementById("expUnitGraph");
     var globalDiv = d3.select(globalDivEl);
     globalDiv.html("");
 
     var divBlocs = document.createElement("div");
     divBlocs.id = "BlocAnimation";
-
     globalDivEl.appendChild(divBlocs);
 
     const div_id = "expUnitGraph";
+
     const taill_coef = 2 / 3;
     var agr = 0.8;
     const cote = document.getElementById(div_id).clientWidth * taill_coef * agr;
@@ -170,8 +153,7 @@
     const width = cote;
     const height = cote;
 
-    //On ajoute un svg a la div
-    svgAnimation = d3
+    var svg = d3
       .select("#" + divBlocs.id)
       .append("svg")
       .attr("width", width + margin.left + margin.right + 5)
@@ -180,15 +162,7 @@
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    svgInfo = d3
-      .select("#" + divBlocs.id)
-      .append("svg")
-      .attr("x", 100)
-      .attr("width", cote_info)
-      .attr("height", height + 50)
-      .style("border", "1px solid blue");
-
-    //Modification des données pour être plus simple a les traité
+    // Traitement des données
     const pack = (d) =>
       d3.pack().size([width, height]).padding(2)(
         d3.hierarchy(d)
@@ -198,28 +172,19 @@
 
     const root = pack(data);
 
-    // var title_essais = root.data.name;
-    // var ex_path = root;
-
-    console.log("date = ", date);
-    // drawPath(width, height);
-    drawBlocs(root.children, width, height);
+    display(root.children);
   }
 
-  /**
-   * Dessin des blocs
-   */
-  function drawBlocs(currentSelection, width, height) {
-    // width = $("#BlocAnimation").width();
-    // height = $("#BlocAnimation").height();
+
+  function display(currentSelection) {
     const nb = currentSelection.length;
     const maxRectInLine = Math.ceil(Math.sqrt(nb));
     const rectWidth = width / maxRectInLine;
     const rectHeight = height / maxRectInLine;
     const rectPadding = 2;
 
-    //var qui contient la svgAnimation qui gères l'affichage des parcelles
-    var square = svgAnimation
+    //var qui contient la svg qui gères l'affichage des parcelles
+    var square = svg
       .selectAll("rect")
       .data(currentSelection)
       .enter()
@@ -240,147 +205,31 @@
       //console.log(`click on `, d.data.name);
       //condition pour éviter de descendre plus bas que la feuille
       if (d.depth != 2) {
-        //ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
+        ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
         //printPass(d)// Ne fonctionne pas dans cette fonction
         resetDisplay();
-        // display(d.children); //affiche les enfants
-        drawBlocs(d.children, width, height);
+        display(d.children); //affiche les enfants
       } else {
         //console.log("append text");
-        //svgInfo.selectAll("text").remove()
+        //svg1.selectAll("text").remove()
         Value(d);
       }
     });
 
-    function Value(d) {
-      if (d.depth == 2) {
-        svgInfo.selectAll("text").remove();
-        //console.log("data =>", Object.keys(d.data).length);
-        var i = 1;
-        $.each(d.data, function (key, val) {
-          //console.log(key + " : " + val);
-          svgInfo
-            .append("text")
-            .attr("x", 20)
-            .attr("y", i * 30)
-            .text(val);
-          i++;
-        });
-      }
-    }
-  }
+    //function hoverClick sur les parcelles
+    square.on("mouseover", handleMouseOver);
 
-  /**
-   * Gestion du slider
-   */
-  function drawSlider() {
-    var margin = { top: 0, right: 50, bottom: 0, left: 50 };
-    var width = 500;
-    var height = 200;
+    //SVG qui permet de faire le retour
+    var pass = svg.append("g").attr("class", "ClassforText");
 
-    var formatDateIntoYear = d3.timeFormat("%Y");
-    var formatDate = d3.timeFormat("%b %Y");
-    var parseDate = d3.timeParse("%m/%d/%y");
-
-    var startDate = new Date("2004-11-01"),
-      endDate = new Date("2017-04-01");
-
-    var svgSlider = d3
-      .select("#slider")
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height);
-
-    var x = d3
-      .scaleTime()
-      .domain([startDate, endDate])
-      .range([0, width])
-      .clamp(true);
-
-    var slider = svgSlider
-      .append("g")
-      .attr("class", "slider")
-      .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
-
-    slider
-      .append("line")
-      .attr("class", "track")
-      .attr("x1", x.range()[0])
-      .attr("x2", x.range()[1])
-      .select(function () {
-        return this.parentNode.appendChild(this.cloneNode(true));
-      })
-      .attr("class", "track-inset")
-      .select(function () {
-        return this.parentNode.appendChild(this.cloneNode(true));
-      })
-      .attr("class", "track-overlay")
-      .call(
-        d3
-          .drag()
-          .on("start.interrupt", function () {
-            slider.interrupt();
-          })
-          .on("start drag", function () {
-            update(x.invert(d3.event.x));
-          })
-      );
-
-    slider
-      .insert("g", ".track-overlay")
-      .attr("class", "ticks")
-      .attr("transform", "translate(0," + 18 + ")")
-      .selectAll("text")
-      .data(x.ticks(10))
-      .enter()
-      .append("text")
-      .attr("x", x)
-      .attr("y", 10)
-      .attr("text-anchor", "middle")
-      .text(function (d) {
-        return formatDateIntoYear(d);
-      });
-
-    var handle = slider
-      .insert("circle", ".track-overlay")
-      .attr("class", "handle")
-      .attr("r", 9);
-
-    var label = slider
-      .append("text")
-      .attr("class", "label")
-      .attr("text-anchor", "middle")
-      .text(formatDate(startDate))
-      .attr("transform", "translate(0," + -25 + ")");
-
-    function update(h) {
-      // update position and text of label according to slider scale
-      handle.attr("cx", x(h));
-      label.attr("x", x(h)).text(formatDate(h));
-
-      // filter data set and redraw plot
-      // var newData = dataset.filter(function (d) {
-      //   return d.date < h;
-      // });
-      // drawPlot(newData);
-      date = h;
-    }
-  }
-
-  /**
-   * Gestion du fil d'ariane
-   */
-  function drawPath(width, height) {
-    var margin = { top: 0, right: 0, bottom: 0, left: 0 };
-    pathElement = svgAnimation.append("g").attr("class", "ClassforText");
-
-    pathElement
+    //ajoute un rectangle
+    pass
       .append("rect")
       .attr("width", width + margin.left + margin.right)
       .attr("height", 40)
       .attr("fill", "lightgrey");
 
-    pathElement
+    pass
       .append("text")
       .attr("x", 6)
       .attr("y", 6 - margin.top)
@@ -391,29 +240,53 @@
       });
 
     //On ajoute une fct Onclick sur le le svg pass
-    // pathElement.on("click", () => {
-    //   if (ex_path.depth != 1) {
-    //     resetDisplay();
-    //     pathElement.select("text").text("<==");
-    //     resetDisplay();
-    //     display(ex_path.children); // retourne au parent
-    //   }
-    // });
+    pass.on("click", () => {
+      if (ex_path.depth != 1) {
+        resetDisplay();
+        pass.select("text").text("<==");
+        resetDisplay();
+        display(ex_path.children); // retourne au parent
+      }
+    });
+
+    //reset de l'affichage pour afficher les éléments
+    function resetDisplay() {
+      svg.selectAll("rect").remove();
+      svg1.selectAll("text").remove();
+      //pass.select("text").text("data")
+    }
+
+    //Affiche les données sur dans le svg info
+    function Value(d) {
+      if (d.depth == 2) {
+        svg1.selectAll("text").remove();
+        //console.log("data =>", Object.keys(d.data).length);
+        var i = 1;
+        $.each(d.data, function (key, val) {
+          //console.log(key + " : " + val);
+          svg1
+            .append("text")
+            .attr("x", 20)
+            .attr("y", i * 30)
+            .text(val);
+          i++;
+        });
+      }
+    }
 
     //affiche le nom de la données dans le svg pass
-    // function printPass(d) {
-    //   pass.select("text").text(d.data.name);
-    // }
+    function printPass(d) {
+      pass.select("text").text(d.data.name);
+    }
 
     //function hoverclick
-    // function handleMouseOver(d, i) {
-    //   //d et i pour des futures modifications
-    //   /**Idée de function :
-    //    * affiche les donneés de la parcelles (+horizons)
-    //    * affiche les logos liées au données
-    //    */
-    //   printPass(d);
-    // }
+    function handleMouseOver(d, i) {
+      //d et i pour des futures modifications
+      /**Idée de function :
+       * affiche les donneés de la parcelles (+horizons)
+       * affiche les logos liées au données
+       */
+      printPass(d);
+    }
   }
-
 })(d3); //end of this file

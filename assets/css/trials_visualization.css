@@ -1,7 +1,6 @@
 /* Pour éviter le troncage des textes dans la vue liste*/
-.dl-horizontal dt
-{
-    white-space: normal;
+.dl-horizontal dt {
+  white-space: normal;
 }
 
 /* ========================= Style pour la map ===============================*/
@@ -13,57 +12,56 @@
 
 /*                            ___ Markers ___                                 */
 .marker-cluster-small {
-	background-color: rgba(181, 226, 140, 0.6);
+  background-color: rgba(181, 226, 140, 0.6);
 }
 .marker-cluster-small div {
-	background-color: rgba(110, 204, 57, 0.6);
+  background-color: rgba(110, 204, 57, 0.6);
 }
 
 .marker-cluster-medium {
-	background-color: rgba(241, 211, 87, 0.6);
+  background-color: rgba(241, 211, 87, 0.6);
 }
 .marker-cluster-medium div {
-	background-color: rgba(240, 194, 12, 0.6);
+  background-color: rgba(240, 194, 12, 0.6);
 }
 
 .marker-cluster-large {
-	background-color: rgba(253, 156, 115, 0.6);
+  background-color: rgba(253, 156, 115, 0.6);
 }
 .marker-cluster-large div {
-	background-color: rgba(241, 128, 23, 0.6);
+  background-color: rgba(241, 128, 23, 0.6);
 }
 
 .marker-cluster {
-	background-clip: padding-box;
-	border-radius: 20px;
+  background-clip: padding-box;
+  border-radius: 20px;
 }
 .marker-cluster div {
-	width: 30px;
-	height: 30px;
-	margin-left: 5px;
-	margin-top: 5px;
+  width: 30px;
+  height: 30px;
+  margin-left: 5px;
+  margin-top: 5px;
 
-	text-align: center;
-	border-radius: 15px;
-	font: 15px "Helvetica Neue", Arial, Helvetica, sans-serif;
+  text-align: center;
+  border-radius: 15px;
+  font: 15px "Helvetica Neue", Arial, Helvetica, sans-serif;
   color: black;
 }
 .marker-cluster span {
-	line-height: 30px;
+  line-height: 30px;
 }
-
 
 /* ========================= Style pour les onglets ==========================*/
 
 .tab-content > .tab-pane {
-    display: block;
-    height:0;
-    overflow:hidden;
+  display: block;
+  height: 0;
+  overflow: hidden;
 }
 
 .tab-content > .active {
-    display: block;
-    height:auto;
+  display: block;
+  height: auto;
 }
 
 /* ========================= Style filtre facteurs ===========================*/
@@ -80,14 +78,14 @@
 }
 
 .levelsDiv {
-  display:inline-block;
-  width:100%;
+  display: inline-block;
+  width: 100%;
 }
 
 .factorLi {
-  padding-left:0 !important;
+  padding-left: 0 !important;
   font-weight: bold;
-  color:#06a181;
+  color: #06a181;
 }
 
 .factorLi:not(:first-child) {
@@ -95,12 +93,12 @@
 }
 
 .levelLi {
-  padding-left:0 !important;
-  color:#4d5157;
+  padding-left: 0 !important;
+  color: #4d5157;
 }
 
 .levelLi:before {
-  content: '\2014';
+  content: "\2014";
   position: absolute;
   margin-left: -20px;
 }
@@ -110,7 +108,7 @@
 }
 
 .factorSelectLevel {
-  margin-top:5px;
+  margin-top: 5px;
 }
 
 .factorSelectLevel .btn,
@@ -121,7 +119,7 @@
 
 .btnRemoveFactor {
   font-size: 0.8em;
-  color:#8e3c3c;
+  color: #8e3c3c;
   vertical-align: baseline;
   padding-left: 5px;
 }
@@ -135,7 +133,7 @@
 
 .btnRemoveLevel {
   padding-right: 1px;
-  padding-top:5px;
+  padding-top: 5px;
   font-size: 0.9em;
 }
 
@@ -144,9 +142,8 @@
   -ms-transform: scale(1.1);
   transform: scale(1.1);
   cursor: pointer;
-  color:#8e3c3c;
+  color: #8e3c3c;
 }
-
 
 /* ========================= Autres ===========================*/
 .fixed-panel {

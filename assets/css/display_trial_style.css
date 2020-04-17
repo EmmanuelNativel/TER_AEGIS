@@ -19,13 +19,12 @@ table.dataTable thead .sorting_desc::after {
 }
 
 .circle {
-    fill: white;
-    /*stroke: steelblue;*/
-    stroke-width: 2px;
+  fill: white;
+  /*stroke: steelblue;*/
+  stroke-width: 2px;
 }
 
-.focusCircle
-{
+.focusCircle {
   stroke: red;
   opacity: 0.8;
   fill: none;
@@ -41,28 +40,28 @@ table.dataTable thead .sorting_desc::after {
 }
 
 .variableLabel {
-  font-size:16px;
-  font-weight:bold;
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .variableScaleCode {
-  font-size:13px;
+  font-size: 13px;
   fill: black;
-  font-weight:bold;
+  font-weight: bold;
 }
 
 .indicatorsBox {
   fill: #a9b1b3;
   fill-opacity: 0.1;
   stroke: grey;
-  stroke-width:2;
+  stroke-width: 2;
   opacity: 0.5;
 }
 
 .indicatorDate {
   font-size: 13px;
   fill: slategrey;
-  font-weight:bold;
+  font-weight: bold;
 }
 
 .valueLabel {
@@ -70,25 +69,21 @@ table.dataTable thead .sorting_desc::after {
   font-weight: bold;
 }
 
-#verticalLineContainer
-{
+#verticalLineContainer {
   position: absolute;
 }
 
-#verticalLine
-{
+#verticalLine {
   stroke: slategrey;
-  stroke-width:2;
+  stroke-width: 2;
 }
 
-#mouseRectangle
-{
-
-    /* fill: blue;
+#mouseRectangle {
+  /* fill: blue;
     opacity: 0.5; */
-    fill: none;
-    stroke: none;
-    pointer-events: all;
+  fill: none;
+  stroke: none;
+  pointer-events: all;
 }
 
 .valueHelpBtn {
@@ -140,7 +135,7 @@ table.dataTable thead .sorting_desc::after {
 }
 
 #expUnit2D_tooltip .tooltipTitle {
-  text-align:center;
+  text-align: center;
   font-size: 15px;
   font-weight: bold;
   color: #06a181;
@@ -152,22 +147,61 @@ table.dataTable thead .sorting_desc::after {
   color: #06a181;
 }
 
-#expUnit2D_tooltip .tooltipItemText{
+#expUnit2D_tooltip .tooltipItemText {
   font-weight: bold;
   color: black;
 }
 
-#expUnit2D_tooltip .tooltipObsDate{
+#expUnit2D_tooltip .tooltipObsDate {
   font-family: sans-serif;
 }
 
-#expUnit2D_tooltip .tooltipFactorName{
+#expUnit2D_tooltip .tooltipFactorName {
   font-weight: bold;
   color: slategrey;
 }
 
-#expUnit2D_tooltip .tooltipFactorLevel{
+#expUnit2D_tooltip .tooltipFactorLevel {
   font-size: 14px;
   font-family: sans-serif;
   color: #595959;
+}
+
+/*==============================================================================
+                  Graphique comparatif d'unités expérimentales
+==============================================================================*/
+
+.ticks {
+  font-size: 10px;
+}
+
+.track,
+.track-inset,
+.track-overlay {
+  stroke-linecap: round;
+}
+
+.track {
+  stroke: #000;
+  stroke-opacity: 0.3;
+  stroke-width: 10px;
+}
+
+.track-inset {
+  stroke: #dcdcdc;
+  stroke-width: 8px;
+}
+
+.track-overlay {
+  pointer-events: stroke;
+  stroke-width: 50px;
+  stroke: transparent;
+  cursor: crosshair;
+}
+
+.handle {
+  fill: #fff;
+  stroke: #000;
+  stroke-opacity: 0.5;
+  stroke-width: 1.25px;
 }
