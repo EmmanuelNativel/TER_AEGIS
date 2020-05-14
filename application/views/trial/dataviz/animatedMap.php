@@ -59,6 +59,6 @@
   </div>
   <div id="expUnitGraph_header"></div>
   <div id="expUnitGraph">
-    <script type="text/javascript" src="<?php echo js_url('display_trial/dataviz/animatedMap') ?>"></script>
+    <script type="text/javascript" src="<?php echo js_url('display_trial/dataviz/animatedMap3') ?>"></script>
   </div>
 </div>

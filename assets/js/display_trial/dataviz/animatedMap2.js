@@ -1,11 +1,19 @@
 (function (d3) {
+  /*============================================================================
+                     Code d3js pour le multi graph des unités expérimentales
+      =============================================================================*/
+  //var selectedGraphHeight = $("#size_selectPicker :selected").val();
   var trialCode = $("#dataviz").attr("trial_code"); // Récupère le code de l'essai courant
   var data = { name: trialCode, children: [] }; //variable locale à ce fichier qui va contenir les données
   let selectedFactors = []; //Liste des facteurs
   let selectedVariable = null; // Valeur à observer
+  let date = null;
+  let svgAnimation = null;
+  let svgInfo = null;
+  let pathElement = null;
+  let currentElement = null;
 
-  // On redessine la dataviz quand on redimensionne la fenêtre
-  window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+  // drawSlider();
 
   /**
    *  Handler pour la selection des facteurs
@@ -58,6 +66,9 @@
     } else redraw();
   }
 
+  // On redessine la dataviz quand on redimensionne la fenêtre
+  window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+
   /**
    * Efface tout
    */
@@ -82,11 +93,108 @@
       dataType: "json",
       success: function (response) {
         //data.children = response.expData; // data est une variable globale
+        console.log("response", response);
         prepareData(response.expData, response.expValues);
-        //parseData();
         onSuccessCallback();
       },
     });
+  }
+
+  function groupBy(array, property) {
+    return array.reduce(function (acc, item) {
+      var key = item[property];
+      acc[key] = acc[key] || [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }
+
+  function loadValues2(date) {
+    $.ajax({
+      url: SiteURL + "/Trials/ajaxLoadDataForAnimatedMap/",
+      data: {
+        //trialCode: JSON.stringify("Matrice_Andrano_0304"),
+        trialCode: JSON.stringify(trialCode), //global var
+        factors: JSON.stringify(selectedFactors),
+        obs_value: JSON.stringify(selectedVariable),
+      },
+      type: "POST",
+      dataType: "json",
+      success: function (response) {
+        //data.children = response.expData; // data est une variable globale
+        // console.log("response", response);
+        // prepareData(response.expData, response.expValues);
+        // onSuccessCallback();
+
+        console.log("VALUES", response.expValues);
+        const vals = getGoodValue(response.expValues);
+        console.log("good values", vals);
+
+        const reducer = (accumulator, currentValue) =>
+          accumulator.add(currentValue.parent_unit_code);
+        const parents = Array.from(response.expData.reduce(reducer, new Set()));
+
+        var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
+
+        // Insertion des valeurs et de leurs dates dans chaque parcelle
+        const dataWithValues = response.expData.map((d) => {
+          const valuesChildren = vals.filter(
+            (child) => child.exp_unit_id === d.exp_unit_id
+          );
+          const valuesNeeded = valuesChildren.map((v) => ({
+            date: parseDate(v.date),
+            value: v.value,
+          }));
+          // const minDate = parseDate(valuesChildren[0].date);
+          // const maxDate = parseDate(valuesChildren.slice(-1)[0].date);
+
+          return {
+            ...d,
+            values: valuesNeeded,
+            // minDate: minDate,
+            // maxDate: maxDate,
+          };
+        });
+
+        // A chaque bloc on y ajoute ses parcelles
+        const hierarchy = parents.map((p) => {
+          return {
+            name: p,
+            children: dataWithValues.filter((d) => d.parent_unit_code === p),
+          };
+        });
+
+        // On ajoute l'essai en racine de la hiérarchie
+        data = {
+          //name: "Matrice_Andrano_0304",
+          name: trialCode,
+          children: hierarchy,
+        };
+        console.log("data", data);
+      },
+    });
+  }
+
+  function getGoodValue(values) {
+    // Grouper par expérience
+    const groups = groupBy(values, "exp_unit_id"); // --> Groupé par exp_id
+    let goodValues = [];
+
+    console.log("groups", groups);
+
+    // Parcours des groupes
+    $.each(groups, function (key, val) {
+      // Sélectionner la bonne date parmis les dates pour chaque groupe
+      const parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
+      const dateMatch = val
+        .filter((v) => parseDate(v.date) <= date)
+        .slice(-1)[0];
+      // Pour chaque exp, on garde la bonne date !
+      // console.log("dates", date, "=>", dateMatch);
+      goodValues.push(dateMatch);
+    });
+
+    return goodValues;
   }
 
   /**
@@ -94,10 +202,26 @@
    * Effet de bord : Insertion des données dans la variable globale data
    */
   function prepareData(dataExp, values) {
+    // console.log("VALUES", values);
+    // const vals = getGoodValue(values);
+    // console.log("good values", vals);
     // Récupère les parents (les blocs)
     const reducer = (accumulator, currentValue) =>
       accumulator.add(currentValue.parent_unit_code);
     const parents = Array.from(dataExp.reduce(reducer, new Set()));
+
+    var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
+
+    // console.log("values", values);
+
+    const allDates = values.map((v) => parseDate(v.date));
+    const mind = d3.min(allDates);
+    const maxd = d3.max(allDates);
+
+    drawSlider(mind, maxd);
+
+    // console.log(allDates)
+    // console.log(mind, maxd);
 
     // Insertion des valeurs et de leurs dates dans chaque parcelle
     const dataWithValues = dataExp.map((d) => {
@@ -105,13 +229,14 @@
         (child) => child.exp_unit_id === d.exp_unit_id
       );
       const valuesNeeded = valuesChildren.map((v) => ({
-        date: v.date,
+        date: parseDate(v.date),
         value: v.value,
       }));
-      return { ...d, values: valuesNeeded };
-    });
+      const minDate = parseDate(valuesChildren[0].date);
+      const maxDate = parseDate(valuesChildren.slice(-1)[0].date);
 
-    //console.log("dataWithValues", dataWithValues);
+      return { ...d, values: valuesNeeded, minDate: minDate, maxDate: maxDate };
+    });
 
     // A chaque bloc on y ajoute ses parcelles
     const hierarchy = parents.map((p) => {
@@ -130,17 +255,26 @@
     console.log("data", data);
   }
 
+  function resetDisplay() {
+    svgAnimation.selectAll("rect").remove();
+    svgAnimation.selectAll("text").remove();
+    svgInfo.selectAll("text").remove();
+    //pass.select("text").text("data")
+  }
+
   function redraw() {
+    //on supprime les svg avant de réafficher
     var globalDivEl = document.getElementById("expUnitGraph");
     var globalDiv = d3.select(globalDivEl);
     globalDiv.html("");
 
+    // La div contenant la visualisation
     var divBlocs = document.createElement("div");
     divBlocs.id = "BlocAnimation";
     globalDivEl.appendChild(divBlocs);
 
+    // Calcul des tailles
     const div_id = "expUnitGraph";
-
     const taill_coef = 2 / 3;
     var agr = 0.8;
     const cote = document.getElementById(div_id).clientWidth * taill_coef * agr;
@@ -153,7 +287,8 @@
     const width = cote;
     const height = cote;
 
-    var svg = d3
+    //Création du svg de la visualisation
+    svgAnimation = d3
       .select("#" + divBlocs.id)
       .append("svg")
       .attr("width", width + margin.left + margin.right + 5)
@@ -162,34 +297,42 @@
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    // Traitement des données
+    // Création du svg chargé d'afficher les informations
+    svgInfo = d3
+      .select("#" + divBlocs.id)
+      .append("svg")
+      .attr("x", 100)
+      .attr("width", cote_info)
+      .attr("height", height + 50)
+      .style("border", "1px solid blue");
+
+    //Modification des données pour être plus simple a les traité
     const pack = (d) =>
-      d3.pack().size([width, height]).padding(2)(
-        d3.hierarchy(d)
-        //.sum(d => d.value)
-        //.sort((a, b) => b.value - a.value)
-      );
+      d3.pack().size([width, height]).padding(2)(d3.hierarchy(d));
 
     const root = pack(data);
 
-    display(root.children);
+    // drawPath(width, height);
+    drawBlocs(root.children, width, height);
   }
 
-
-  function display(currentSelection) {
+  /**
+   * Dessin des blocs
+   */
+  function drawBlocs(currentSelection, width, height) {
+    currentElement = currentSelection;
     const nb = currentSelection.length;
     const maxRectInLine = Math.ceil(Math.sqrt(nb));
     const rectWidth = width / maxRectInLine;
     const rectHeight = height / maxRectInLine;
     const rectPadding = 2;
 
-    //var qui contient la svg qui gères l'affichage des parcelles
-    var square = svg
+    //var qui contient la svgAnimation qui gères l'affichage des parcelles
+    var square = svgAnimation
       .selectAll("rect")
       .data(currentSelection)
       .enter()
       .append("rect")
-      //.text(function(d) {return d.data.name})
       .attr("x", (d, i) => {
         return (i % maxRectInLine) * rectWidth + 1;
       })
@@ -200,36 +343,173 @@
       .attr("height", rectHeight - rectPadding)
       .attr("fill", "green");
 
+    var labels = svgAnimation
+      .selectAll("text")
+      .data(currentSelection)
+      .enter()
+      .append("text")
+      .text((d) => d.data.name)
+      .attr("x", (d, i) => {
+        return (i % maxRectInLine) * rectWidth + 1 + rectWidth / 2;
+      })
+      .attr("y", (d, i) => {
+        return Math.trunc(i / maxRectInLine) * rectHeight + 45 + rectHeight / 2;
+      })
+      .attr("font-size", "11px")
+      .attr("fill", "white")
+      .attr("text-anchor", "middle");
+
     //fct click sur les rectangles
     square.on("click", (d, i) => {
-      //console.log(`click on `, d.data.name);
       //condition pour éviter de descendre plus bas que la feuille
       if (d.depth != 2) {
-        ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
+        //ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
         //printPass(d)// Ne fonctionne pas dans cette fonction
         resetDisplay();
-        display(d.children); //affiche les enfants
+        drawBlocs(d.children, width, height);
       } else {
-        //console.log("append text");
-        //svg1.selectAll("text").remove()
-        Value(d);
+        updateInformations(d);
       }
     });
+  }
 
-    //function hoverClick sur les parcelles
-    square.on("mouseover", handleMouseOver);
+  function updateInformations(d) {
+    if (d.depth == 2) {
+      svgInfo.selectAll("text").remove();
+      var i = 1;
+      $.each(d.data, function (key, val) {
+        // console.log(key + " : " + val);
+        if (key === "values") {
+          var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
+          const valueMatched = val
+            .filter((v) => parseDate(v.date) <= date)
+            .slice(-1)[0];
+          // val = `${parseDate(valueMatched.date)} => ${valueMatched.value}`
+          val = valueMatched.value;
+        }
+        svgInfo
+          .append("text")
+          .attr("x", 20)
+          .attr("y", i * 30)
+          .text(val);
+        i++;
+      });
+    }
+  }
 
-    //SVG qui permet de faire le retour
-    var pass = svg.append("g").attr("class", "ClassforText");
+  /**
+   * Gestion du slider
+   */
+  function drawSlider(startDate, endDate) {
+    // On efface le slider
+    $("#slider").html("");
 
-    //ajoute un rectangle
-    pass
+    var margin = { top: 0, right: 50, bottom: 0, left: 50 };
+    var width = 500;
+    var height = 200;
+
+    var formatDateIntoMY = d3.timeFormat("%m/%Y");
+    var formatDate = d3.timeFormat("%b %Y");
+    var parseDate = d3.timeParse("%m/%d/%y");
+
+    // var startDate = new Date("2004-11-01"),
+    //   endDate = new Date("2017-04-01");
+
+    var svgSlider = d3
+      .select("#slider")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height);
+
+    var x = d3
+      .scaleTime()
+      .domain([startDate, endDate])
+      .range([0, width])
+      .clamp(true);
+
+    var slider = svgSlider
+      .append("g")
+      .attr("class", "slider")
+      .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
+
+    slider
+      .append("line")
+      .attr("class", "track")
+      .attr("x1", x.range()[0])
+      .attr("x2", x.range()[1])
+      .select(function () {
+        return this.parentNode.appendChild(this.cloneNode(true));
+      })
+      .attr("class", "track-inset")
+      .select(function () {
+        return this.parentNode.appendChild(this.cloneNode(true));
+      })
+      .attr("class", "track-overlay")
+      .call(
+        d3
+          .drag()
+          .on("start.interrupt", function () {
+            slider.interrupt();
+          })
+          .on("start drag", function () {
+            update(x.invert(d3.event.x));
+          })
+      );
+
+    slider
+      .insert("g", ".track-overlay")
+      .attr("class", "ticks")
+      .attr("transform", "translate(0," + 18 + ")")
+      .selectAll("text")
+      .data(x.ticks(10))
+      .enter()
+      .append("text")
+      .attr("x", x)
+      .attr("y", 10)
+      .attr("text-anchor", "middle")
+      .text(function (d) {
+        return formatDateIntoMY(d);
+      });
+
+    var handle = slider
+      .insert("circle", ".track-overlay")
+      .attr("class", "handle")
+      .attr("r", 9);
+
+    var label = slider
+      .append("text")
+      .attr("class", "label")
+      .attr("text-anchor", "middle")
+      .text(formatDate(startDate))
+      .attr("transform", "translate(0," + -25 + ")");
+
+    function update(h) {
+      // update position and text of label according to slider scale
+      handle.attr("cx", x(h));
+      label.attr("x", x(h)).text(formatDate(h));
+
+      date = h;
+      // drawBlocs(currentElement, width, height);
+      // loadData(() => redraw());
+      loadValues2(date);
+      // loadData(() => {});
+    }
+  }
+
+  /**
+   * Gestion du fil d'ariane
+   */
+  function drawPath(width, height) {
+    var margin = { top: 0, right: 0, bottom: 0, left: 0 };
+    pathElement = svgAnimation.append("g").attr("class", "ClassforText");
+
+    pathElement
       .append("rect")
       .attr("width", width + margin.left + margin.right)
       .attr("height", 40)
       .attr("fill", "lightgrey");
 
-    pass
+    pathElement
       .append("text")
       .attr("x", 6)
       .attr("y", 6 - margin.top)
@@ -240,53 +520,28 @@
       });
 
     //On ajoute une fct Onclick sur le le svg pass
-    pass.on("click", () => {
-      if (ex_path.depth != 1) {
-        resetDisplay();
-        pass.select("text").text("<==");
-        resetDisplay();
-        display(ex_path.children); // retourne au parent
-      }
-    });
-
-    //reset de l'affichage pour afficher les éléments
-    function resetDisplay() {
-      svg.selectAll("rect").remove();
-      svg1.selectAll("text").remove();
-      //pass.select("text").text("data")
-    }
-
-    //Affiche les données sur dans le svg info
-    function Value(d) {
-      if (d.depth == 2) {
-        svg1.selectAll("text").remove();
-        //console.log("data =>", Object.keys(d.data).length);
-        var i = 1;
-        $.each(d.data, function (key, val) {
-          //console.log(key + " : " + val);
-          svg1
-            .append("text")
-            .attr("x", 20)
-            .attr("y", i * 30)
-            .text(val);
-          i++;
-        });
-      }
-    }
+    // pathElement.on("click", () => {
+    //   if (ex_path.depth != 1) {
+    //     resetDisplay();
+    //     pathElement.select("text").text("<==");
+    //     resetDisplay();
+    //     display(ex_path.children); // retourne au parent
+    //   }
+    // });
 
     //affiche le nom de la données dans le svg pass
-    function printPass(d) {
-      pass.select("text").text(d.data.name);
-    }
+    // function printPass(d) {
+    //   pass.select("text").text(d.data.name);
+    // }
 
     //function hoverclick
-    function handleMouseOver(d, i) {
-      //d et i pour des futures modifications
-      /**Idée de function :
-       * affiche les donneés de la parcelles (+horizons)
-       * affiche les logos liées au données
-       */
-      printPass(d);
-    }
+    // function handleMouseOver(d, i) {
+    //   //d et i pour des futures modifications
+    //   /**Idée de function :
+    //    * affiche les donneés de la parcelles (+horizons)
+    //    * affiche les logos liées au données
+    //    */
+    //   printPass(d);
+    // }
   }
 })(d3); //end of this file

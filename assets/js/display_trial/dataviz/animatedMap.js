@@ -11,6 +11,7 @@
   let svgAnimation = null;
   let svgInfo = null;
   let pathElement = null;
+  let currentElement = null;
 
   drawSlider();
 
@@ -121,8 +122,6 @@
       return { ...d, values: valuesNeeded };
     });
 
-    //console.log("dataWithValues", dataWithValues);
-
     // A chaque bloc on y ajoute ses parcelles
     const hierarchy = parents.map((p) => {
       return {
@@ -142,6 +141,7 @@
 
   function resetDisplay() {
     svgAnimation.selectAll("rect").remove();
+    svgAnimation.selectAll("text").remove();
     svgInfo.selectAll("text").remove();
     //pass.select("text").text("data")
   }
@@ -152,11 +152,12 @@
     var globalDiv = d3.select(globalDivEl);
     globalDiv.html("");
 
+    // La div contenant la visualisation
     var divBlocs = document.createElement("div");
     divBlocs.id = "BlocAnimation";
-
     globalDivEl.appendChild(divBlocs);
 
+    // Calcul des tailles
     const div_id = "expUnitGraph";
     const taill_coef = 2 / 3;
     var agr = 0.8;
@@ -170,7 +171,7 @@
     const width = cote;
     const height = cote;
 
-    //On ajoute un svg a la div
+    //Création du svg de la visualisation
     svgAnimation = d3
       .select("#" + divBlocs.id)
       .append("svg")
@@ -180,6 +181,7 @@
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+    // Création du svg chargé d'afficher les informations
     svgInfo = d3
       .select("#" + divBlocs.id)
       .append("svg")
@@ -190,18 +192,10 @@
 
     //Modification des données pour être plus simple a les traité
     const pack = (d) =>
-      d3.pack().size([width, height]).padding(2)(
-        d3.hierarchy(d)
-        //.sum(d => d.value)
-        //.sort((a, b) => b.value - a.value)
-      );
+      d3.pack().size([width, height]).padding(2)(d3.hierarchy(d));
 
     const root = pack(data);
 
-    // var title_essais = root.data.name;
-    // var ex_path = root;
-
-    console.log("date = ", date);
     // drawPath(width, height);
     drawBlocs(root.children, width, height);
   }
@@ -210,8 +204,7 @@
    * Dessin des blocs
    */
   function drawBlocs(currentSelection, width, height) {
-    // width = $("#BlocAnimation").width();
-    // height = $("#BlocAnimation").height();
+    currentElement = currentSelection;
     const nb = currentSelection.length;
     const maxRectInLine = Math.ceil(Math.sqrt(nb));
     const rectWidth = width / maxRectInLine;
@@ -224,7 +217,6 @@
       .data(currentSelection)
       .enter()
       .append("rect")
-      //.text(function(d) {return d.data.name})
       .attr("x", (d, i) => {
         return (i % maxRectInLine) * rectWidth + 1;
       })
@@ -235,38 +227,57 @@
       .attr("height", rectHeight - rectPadding)
       .attr("fill", "green");
 
+    var labels = svgAnimation
+      .selectAll("text")
+      .data(currentSelection)
+      .enter()
+      .append("text")
+      .text((d) => d.data.name)
+      .attr("x", (d, i) => {
+        return (i % maxRectInLine) * rectWidth + 1 + rectWidth / 2;
+      })
+      .attr("y", (d, i) => {
+        return Math.trunc(i / maxRectInLine) * rectHeight + 45 + rectHeight / 2;
+      })
+      .attr("font-size", "11px")
+      .attr("fill", "white")
+      .attr("text-anchor", "middle");
+
     //fct click sur les rectangles
     square.on("click", (d, i) => {
-      //console.log(`click on `, d.data.name);
       //condition pour éviter de descendre plus bas que la feuille
       if (d.depth != 2) {
         //ex_path = d.parent; // -> On récuperer les parents de "d" qu'on stock dans une var global
         //printPass(d)// Ne fonctionne pas dans cette fonction
         resetDisplay();
-        // display(d.children); //affiche les enfants
         drawBlocs(d.children, width, height);
       } else {
-        //console.log("append text");
-        //svgInfo.selectAll("text").remove()
-        Value(d);
+        updateInformations(d);
       }
     });
+  }
 
-    function Value(d) {
-      if (d.depth == 2) {
-        svgInfo.selectAll("text").remove();
-        //console.log("data =>", Object.keys(d.data).length);
-        var i = 1;
-        $.each(d.data, function (key, val) {
-          //console.log(key + " : " + val);
-          svgInfo
-            .append("text")
-            .attr("x", 20)
-            .attr("y", i * 30)
-            .text(val);
-          i++;
-        });
-      }
+  function updateInformations(d) {
+    if (d.depth == 2) {
+      svgInfo.selectAll("text").remove();
+      var i = 1;
+      $.each(d.data, function (key, val) {
+        // console.log(key + " : " + val);
+        if (key === "values") {
+          var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
+          const valueMatched = val
+            .filter((v) => parseDate(v.date) <= date)
+            .slice(-1)[0];
+          // val = `${parseDate(valueMatched.date)} => ${valueMatched.value}`
+          val = valueMatched.value;
+        }
+        svgInfo
+          .append("text")
+          .attr("x", 20)
+          .attr("y", i * 30)
+          .text(val);
+        i++;
+      });
     }
   }
 
@@ -358,12 +369,8 @@
       handle.attr("cx", x(h));
       label.attr("x", x(h)).text(formatDate(h));
 
-      // filter data set and redraw plot
-      // var newData = dataset.filter(function (d) {
-      //   return d.date < h;
-      // });
-      // drawPlot(newData);
       date = h;
+      drawBlocs(currentElement, width, height);
     }
   }
 
@@ -415,5 +422,4 @@
     //   printPass(d);
     // }
   }
-
 })(d3); //end of this file
