@@ -66,6 +66,9 @@
     }
   }
 
+  // On redessine la dataviz quand on redimensionne la fenêtre
+  // window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+
   function drawSVG() {
     var globalDivEl = document.getElementById("expUnitGraph");
     var globalDiv = d3.select(globalDivEl);
@@ -111,6 +114,7 @@
   }
 
   function prepareData(dataH, dataV) {
+    // console.log("prepareData", dataH);
     // Récupération des premiers enfants (les blocs)
     const reducer = (accumulator, currentValue) =>
       accumulator.add(currentValue.parent_unit_code);
@@ -127,6 +131,8 @@
         date: parseDate(v.date),
         value: v.value,
       }));
+
+      // console.log("valuesNeeded", valuesNeeded);
 
       return { ...d, values: valuesNeeded };
     });
@@ -170,9 +176,10 @@
       children: hierarchy,
     };
 
-    const pack = (d) => d3.pack().size([0, 0]).padding(2)(d3.hierarchy(d));
+    // const pack = (d) => d3.pack().size([0, 0]).padding(2)(d3.hierarchy(d));
+    // const root = pack(data);
 
-    const root = pack(data);
+    const root = d3.hierarchy(data);
 
     return root;
   }
@@ -207,9 +214,8 @@
   }
 
   function drawChildren(elements) {
-    // console.log("elements", elements);
     svgAnimation.selectAll("rect").remove(); // On efface les anciens éléments
-    svgAnimation.selectAll("text").remove();  // On efface les anciens labels
+    svgAnimation.selectAll("text").remove(); // On efface les anciens labels
 
     const nb = elements.length; // Le nombre d'éléments à insérer
     const maxRectInLine = Math.ceil(Math.sqrt(nb)); // Le nombre maximum d'éléments par ligne
@@ -219,9 +225,9 @@
     const rectPadding = 2;
 
     // Affichage des éléments sous forme de rectangles
-    var square = svgAnimation
-      .selectAll("rect")
-      .data(elements)
+    var square = svgAnimation.selectAll("rect").data(elements);
+
+    square
       .enter()
       .append("rect")
       .attr("x", (d, i) => {
@@ -232,14 +238,23 @@
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
-      .attr("fill", "green");
+      .attr("fill", "green")
+      .on("click", (d, i) => {
+        if (d.hasOwnProperty("children")) {
+          current_element = d; // On change l'élément courant
+          drawChildren(current_element.children); // On affiche les enfants de l'élément courant
+        } else console.log("L'élément sélectionné n'a pas d'enfants !");
+      });
 
-    var labels = svgAnimation
-      .selectAll("text")
-      .data(elements)
+    var labels = svgAnimation.selectAll("text").data(elements);
+
+    labels
       .enter()
       .append("text")
-      .text((d) => d.data.name)
+      // .text((d) => d.data.name)
+      .text((d) =>
+        d.depth > 1 ? current_values[d.data.exp_unit_id].value : d.data.name
+      )
       .attr("x", (d, i) => {
         return (i % maxRectInLine) * rectWidth + rectWidth / 2;
       })
@@ -251,12 +266,12 @@
       .attr("text-anchor", "middle");
 
     // Handler de l'évènement "click" sur un des éléments
-    square.on("click", (d, i) => {
-      if (d.hasOwnProperty("children")) {
-        current_element = d; // On change l'élément courant
-        drawChildren(current_element.children); // On affiche les enfants de l'élément courant
-      } else console.log("L'élément sélectionné n'a pas d'enfants !");
-    });
+    // square.on("click", (d, i) => {
+    //   if (d.hasOwnProperty("children")) {
+    //     current_element = d; // On change l'élément courant
+    //     drawChildren(current_element.children); // On affiche les enfants de l'élément courant
+    //   } else console.log("L'élément sélectionné n'a pas d'enfants !");
+    // });
   }
 
   function drawSlider(dMin, dMax) {
