@@ -16,9 +16,11 @@
   let WIDTH = document.getElementById(div_id).clientWidth;
   let HEIGHT = document.getElementById(div_id).clientWidth;
   let svgAnimation = null; // SVG contenant l'animation
-  const MIN_COLOR = "white";
-  const MAX_COLOR = "black";
-  const DEFAULT_COLOR = "green";
+  const MIN_COLOR = "#EAFAF1";
+  const MAX_COLOR = "#186A3B";
+  const DEFAULT_COLOR = "#17202A";
+  const BACKGROUND_COLOR = "#AAB7B8";
+  let path = [];
 
   /**
    * Sélection des facteurs :
@@ -66,6 +68,7 @@
       drawSVG();
       loadData(() => {
         drawChildren(current_element.children);
+        getPath(current_element);
         optionalCallback();
       });
     }
@@ -88,7 +91,8 @@
       // .attr("height", HEIGHT + margin.bottom + margin.top + 50)
       .attr("width", globalDiv.style("width"))
       .attr("height", globalDiv.style("width"))
-      .style("border", "1px solid red")
+      .style("background-color", BACKGROUND_COLOR)
+      // .style("border", "1px solid red")
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
@@ -110,14 +114,12 @@
         VALUES = response.expValues;
         obs_values = prepareValues(response.expValues); // Préparation des valeurs
         current_values = JSON.parse(JSON.stringify(obs_values));
-        // console.log("current_values", current_values);
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
   }
 
   function prepareData(dataH, dataV) {
-    // console.log("prepareData", dataH);
     // Récupération des premiers enfants (les blocs)
     const reducer = (accumulator, currentValue) =>
       accumulator.add(currentValue.parent_unit_code);
@@ -134,8 +136,6 @@
         date: parseDate(v.date),
         value: v.value,
       }));
-
-      // console.log("valuesNeeded", valuesNeeded);
 
       return { ...d, values: valuesNeeded };
     });
@@ -221,6 +221,14 @@
     return groupedValues;
   }
 
+  function getPath(element) {
+    path = element.ancestors().reverse();
+    let r = "";
+    path.map((p) => (r += p.data.name + " / "));
+    console.log("path -> ", path);
+    console.log("path name -> ", r);
+  }
+
   function drawChildren(elements) {
     svgAnimation.selectAll("rect").remove(); // On efface les anciens éléments
     svgAnimation.selectAll("text").remove(); // On efface les anciens labels
@@ -240,8 +248,6 @@
       .domain([valueMin, valueMax])
       .range([MIN_COLOR, MAX_COLOR]);
 
-    // console.log("range", valueMin, valueMax);
-
     square
       .enter()
       .append("rect")
@@ -253,6 +259,7 @@
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
+      .attr("id", (d, i) => "sqr_" + i)
       .attr("fill", (d) =>
         d.depth > 1
           ? squareColor(Number(current_values[d.data.exp_unit_id].value))
@@ -262,7 +269,9 @@
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
           getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
-          drawChildren(current_element.children); // On affiche les enfants de l'élément courant
+          // drawChildren(current_element.children); // On affiche les enfants de l'élément courant
+          AnimationZoom(i, current_element.children); //ajout Animation zoom
+          getPath(d);
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
       });
 
@@ -291,6 +300,9 @@
       .attr("text-anchor", "middle");
   }
 
+  /**
+   * Détermiantion des valeurs minimale et maximale pour les enfant de l'élément sélectionné.
+   */
   function getValuesRange(parentName) {
     const valuesOfCurrentElements = VALUES.filter(
       (v) => v.parent_unit_code === parentName
@@ -420,5 +432,37 @@
         current_values[exp_unit] = bestValue;
       }
     }
+  }
+
+  //animation zoom
+  function AnimationZoom(id, data) {
+    console.log("Animation Zoom");
+    var selectSqr = d3.select("#sqr_" + id);
+
+    // var squareColor = d3
+    //   .scaleLinear()
+    //   .domain([valueMin, valueMax])
+    //   .range([MIN_COLOR, MAX_COLOR]);
+
+    // selectSqr.attr("fill", ZOOM_COLOR);
+
+    selectSqr.raise(); //On met le carré au premier plan
+    selectSqr
+      .transition()
+      .duration(1000)
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", WIDTH)
+      .attr("height", HEIGHT)
+      .attr("fill", BACKGROUND_COLOR)
+
+      //ajout de la couleur suivante
+      // .attr("fill", () => {
+      //       squareColor(Number(current_values[data.data.exp_unit_id].value))
+      // })
+      .on("end", () => {
+        //Attend la fin de l'animation
+        drawChildren(data); // On affiche les enfants de l'élément courant
+      });
   }
 })(d3);

@@ -67,5 +67,5 @@
  * - Régler le problème des tailles
  * - Choisir entre SVG et HTML pour afficher les informations
  * - Ajouter le fil d'ariane
- * - Afficher les couleurs -> Récupérer les bonnes bornes ! -> Changer quand on clique ! 
+ * - Afficher les couleurs -> Récupérer les bonnes bornes ! -> Changer quand on clique !
  */
