@@ -67,6 +67,7 @@
     } else {
       drawSVG();
       loadData(() => {
+        updateValues(selected_date);
         drawChildren(current_element.children);
         getPath(current_element);
         optionalCallback();
@@ -266,6 +267,8 @@
           : DEFAULT_COLOR
       )
       .on("click", (d, i) => {
+        console.log("Data", d);
+        console.log("current_values", current_values);
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
           getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
@@ -436,7 +439,6 @@
 
   //animation zoom
   function AnimationZoom(id, data) {
-    console.log("Animation Zoom");
     var selectSqr = d3.select("#sqr_" + id);
 
     // var squareColor = d3

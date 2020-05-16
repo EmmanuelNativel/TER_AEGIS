@@ -68,4 +68,6 @@
  * - Choisir entre SVG et HTML pour afficher les informations
  * - Ajouter le fil d'ariane
  * - Afficher les couleurs -> Récupérer les bonnes bornes ! -> Changer quand on clique !
+ * - Problème matrice Andrano ! -> Requête trop longue
+ * - loadata seulement quand on clique sur un élément
  */
