@@ -1,11 +1,14 @@
 (function (d3) {
   let hierarchy = {}; // Hiérarchie générale pour les facteurs choisis
   let obs_values = []; // Les valeurs observées pour les facteurs et la variable choisie
+  let VALUES = [];
   let selected_date = null; // La date sélectionnée
   let current_element = {}; // L'élément courant dans l'animation
   let current_values = []; // Les valeurs filtrées par la date sélectionnée
   let dateMin = null;
   let dateMax = null;
+  let valueMin = null;
+  let valueMax = null;
   const trialCode = $("#dataviz").attr("trial_code"); // Le code de l'essai courant
   let selectedFactors = []; // Liste des facteurs sélectionnés
   let selectedVariable = null; // La valeur à observer sélectionnée
@@ -13,7 +16,9 @@
   let WIDTH = document.getElementById(div_id).clientWidth;
   let HEIGHT = document.getElementById(div_id).clientWidth;
   let svgAnimation = null; // SVG contenant l'animation
-  let mainData = null;
+  const MIN_COLOR = "white";
+  const MAX_COLOR = "black";
+  const DEFAULT_COLOR = "green";
 
   /**
    * Sélection des facteurs :
@@ -67,7 +72,7 @@
   }
 
   // On redessine la dataviz quand on redimensionne la fenêtre
-  // window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+  // window.addEventListener("resize", drawChildren); //listener pour redessiner lors du resize
 
   function drawSVG() {
     var globalDivEl = document.getElementById("expUnitGraph");
@@ -99,15 +104,13 @@
       type: "POST",
       dataType: "json",
       success: function (response) {
-        // console.log("hierarchy response", response.expData);
-        // console.log("values response", response.expValues);
-        // console.log("DATA", prepareData(response.expData, response.expValues));
-        // const root = prepareData(response.expData, response.expValues);
         const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
         hierarchy = root; // Stockage de la hiérarchie
         current_element = root; // On indique l'élément courant
+        VALUES = response.expValues;
         obs_values = prepareValues(response.expValues); // Préparation des valeurs
         current_values = JSON.parse(JSON.stringify(obs_values));
+        // console.log("current_values", current_values);
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -196,15 +199,20 @@
   function prepareValues(data) {
     const parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
     const allDates = [];
+    const allValues = [];
 
     data = data.map((d) => {
       const parsedDate = parseDate(d.date); // Parsing des dates
       allDates.push(parsedDate); // Récupération de toutes les dates
+      allValues.push(d.value); // Récupération de toutes les dates
       return { ...d, date: parsedDate };
     });
 
     dateMin = d3.min(allDates); // Récupération de la date la plus ancienne
     dateMax = d3.max(allDates); // Récupération de la date la plus récente
+
+    valueMin = Math.ceil(d3.min(allValues)); // Récupération de la date la plus ancienne
+    valueMax = Math.ceil(d3.max(allValues)); // Récupération de la date la plus récente
 
     selected_date = dateMin;
 
@@ -227,6 +235,13 @@
     // Affichage des éléments sous forme de rectangles
     var square = svgAnimation.selectAll("rect").data(elements);
 
+    var squareColor = d3
+      .scaleLinear()
+      .domain([valueMin, valueMax])
+      .range([MIN_COLOR, MAX_COLOR]);
+
+    // console.log("range", valueMin, valueMax);
+
     square
       .enter()
       .append("rect")
@@ -238,10 +253,15 @@
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
-      .attr("fill", "green")
+      .attr("fill", (d) =>
+        d.depth > 1
+          ? squareColor(Number(current_values[d.data.exp_unit_id].value))
+          : DEFAULT_COLOR
+      )
       .on("click", (d, i) => {
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
+          getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
           drawChildren(current_element.children); // On affiche les enfants de l'élément courant
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
       });
@@ -251,9 +271,14 @@
     labels
       .enter()
       .append("text")
-      // .text((d) => d.data.name)
       .text((d) =>
-        d.depth > 1 ? current_values[d.data.exp_unit_id].value : d.data.name
+        d.depth > 1
+          ? current_values[d.data.exp_unit_id].value +
+            " " +
+            d.data.exp_unit_id +
+            " " +
+            d.data.name
+          : d.data.name
       )
       .attr("x", (d, i) => {
         return (i % maxRectInLine) * rectWidth + rectWidth / 2;
@@ -262,20 +287,19 @@
         return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
       })
       .attr("font-size", "11px")
-      .attr("fill", "white")
+      .attr("fill", "red")
       .attr("text-anchor", "middle");
+  }
 
-    // Handler de l'évènement "click" sur un des éléments
-    // square.on("click", (d, i) => {
-    //   if (d.hasOwnProperty("children")) {
-    //     current_element = d; // On change l'élément courant
-    //     drawChildren(current_element.children); // On affiche les enfants de l'élément courant
-    //   } else console.log("L'élément sélectionné n'a pas d'enfants !");
-    // });
+  function getValuesRange(parentName) {
+    const valuesOfCurrentElements = VALUES.filter(
+      (v) => v.parent_unit_code === parentName
+    ).map((v) => Number(v.value));
+    valueMin = Math.floor(d3.min(valuesOfCurrentElements));
+    valueMax = Math.ceil(d3.max(valuesOfCurrentElements));
   }
 
   function drawSlider(dMin, dMax) {
-    console.log("ANIMATED MAP 3");
     // On efface le slider
     $("#slider").html("");
 
@@ -328,11 +352,11 @@
       .attr("class", "ticks")
       .attr("transform", "translate(0," + 18 + ")")
       .selectAll("text")
-      .data(x.ticks(10))
+      // .data(x.ticks(10))
       .enter()
       .append("text")
       .attr("x", x)
-      .attr("y", 10)
+      // .attr("y", 10)
       .attr("text-anchor", "middle")
       .text(function (d) {
         return formatDateIntoMY(d);
@@ -373,30 +397,28 @@
       const exactDates = values.filter(
         (v) => parseDate(v.date) === parseDate(date)
       );
-      if (exactDates.length > 0) current_values[exp_unit] = exactDates;
+
+      if (exactDates.length > 0) current_values[exp_unit] = exactDates[0];
       else {
         const bestLowerDateValue = values
           .filter((v) => v.date < date)
           .slice(-1)[0];
         const bestUpperDateValue = values.filter((v) => v.date > date)[0];
-        const lowerNumberOfDays = Math.abs(date - bestLowerDateValue.date);
-        const upperNumberOfDays = Math.abs(date - bestUpperDateValue.date);
-        const bestValue =
-          Math.min(lowerNumberOfDays, upperNumberOfDays) === lowerNumberOfDays
-            ? bestLowerDateValue
-            : bestUpperDateValue;
-        current_values[exp_unit] = bestValue;
+        let bestValue;
+        if (bestUpperDateValue === undefined) bestValue = bestLowerDateValue;
+        else if (bestLowerDateValue === undefined)
+          bestValue = bestUpperDateValue;
+        else {
+          const lowerNumberOfDays = Math.abs(date - bestLowerDateValue.date);
+          const upperNumberOfDays = Math.abs(date - bestUpperDateValue.date);
+          bestValue =
+            Math.min(lowerNumberOfDays, upperNumberOfDays) === lowerNumberOfDays
+              ? bestLowerDateValue
+              : bestUpperDateValue;
+        }
 
-        // console.log("BEST VALUE", bestValue);
-        // console.log("SELECTED DATE", date);
-        // const feuille = current_element
-        //   .leaves()
-        //   .filter((f) => f.data.exp_unit_id === exp_unit)[0];
-        // feuille.data.value = bestValue.value;
-        // feuille.data.date = bestValue.date;
-        // // console.log("feuille", feuille);
+        current_values[exp_unit] = bestValue;
       }
     }
-    // console.log("current_element AFTER", current_element);
   }
 })(d3);
