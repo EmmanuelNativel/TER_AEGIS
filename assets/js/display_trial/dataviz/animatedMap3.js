@@ -504,6 +504,9 @@
       .attr("y", 0)
       .attr("width", WIDTH)
       .attr("height", HEIGHT)
+      .transition()
+      .duration(500)
+      .style("opacity", 0)
       .on("start", (d) => {
         svgAnimation.selectAll("rect").attr("opacity", 0);
         svgAnimation.selectAll("text").attr("opacity", 0);
@@ -519,6 +522,9 @@
       .duration(1000)
       .attr("x", WIDTH / 2)
       .attr("y", HEIGHT / 2)
-      .attr("font-size", "50px");
+      .attr("font-size", "50px")
+      .transition()
+      .duration(500)
+      .style("opacity", 0);
   }
 })(d3);
