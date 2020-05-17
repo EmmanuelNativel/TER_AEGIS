@@ -53,12 +53,27 @@
     </div>
     */
     ?>
+  </div>
 
+  <div class="row">
     <div id="slider"></div>
+  </div>
+
+  <div class="row">
+    <div class="light-font">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" id="breadcrumb">
+          <!-- <li class="breadcrumb-item"><a class="white-text" href="#">Home</a></li> -->
+          <!-- <li class="breadcrumb-item"><a class="white-text" href="#">Library</a></li> -->
+          <!-- <li class="breadcrumb-item active">Data</li> -->
+        </ol>
+      </nav>
+    </div>
+  </div>
+  <div class="row">
+    <div id="expUnitGraph_header"></div>
+    <div id="expUnitGraph">
+      <script type="text/javascript" src="<?php echo js_url('display_trial/dataviz/animatedMap3') ?>"></script>
+    </div>
 
   </div>
-  <div id="expUnitGraph_header"></div>
-  <div id="expUnitGraph">
-    <script type="text/javascript" src="<?php echo js_url('display_trial/dataviz/animatedMap3') ?>"></script>
-  </div>
-</div>

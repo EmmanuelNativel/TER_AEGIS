@@ -243,11 +243,30 @@
   }
 
   function getPath(element) {
+    const breadcrumb_id = "breadcrumb";
+
+    d3.select("#" + breadcrumb_id)
+      .selectAll("li")
+      .remove();
+
     path = element.ancestors().reverse();
-    let r = "";
-    path.map((p) => (r += p.data.name + " / "));
-    console.log("path -> ", path);
-    console.log("path name -> ", r);
+    const breadcrumb = d3
+      .select("#" + breadcrumb_id)
+      .selectAll("li")
+      .data(path);
+
+    breadcrumb
+      .enter()
+      .append("li")
+      .attr("class", "breadcrumb-item")
+      .html((d) => "<a  class='white-text'>" + d.data.name + "</a>")
+      .on("click", (d) => {
+        if (d === current_element) return;
+        current_element = d;
+        drawChildren(d.children);
+        getPath(current_element);
+        console.log(path);
+      });
   }
 
   function drawChildren(elements) {
