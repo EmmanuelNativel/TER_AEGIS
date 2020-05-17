@@ -297,4 +297,29 @@ class Trial_model extends MY_Model
       ->get()
       ->result_array();
   }
+
+  public function get_exp_data_values2($trial_code, $obs_variable, $parent_name)
+  {
+    $select = array(
+      "e.exp_unit_id",
+      "e.level_label",
+      "e2.unit_code as parent_unit_code",
+      "ob.obs_value as value",
+      "ob.obs_date as date",
+      "ob.obs_variable as variable"
+    );
+
+    return $this->db->select($select)
+      ->from("exp_unit e")
+      ->join("exp_unit e2", "e2.exp_unit_id = e.assigned_to")
+      ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id ")
+      ->where("e.trial_code", $trial_code)
+      ->where("e2.unit_code", $parent_name)
+      ->where_in("e.level_label", array('plot', 'parcelle'))
+      ->where("ob.obs_variable", $obs_variable)
+      ->order_by("exp_unit_id", "ASC")
+      ->order_by("obs_date", "ASC")
+      ->get()
+      ->result_array();
+  }
 }

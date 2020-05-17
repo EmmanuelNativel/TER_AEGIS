@@ -63,11 +63,14 @@
 })(d3);
 
 /**
- * TODO : 
+ * TODO :
  * - Régler le problème des tailles
  * - Choisir entre SVG et HTML pour afficher les informations
  * - Ajouter le fil d'ariane
  * - Afficher les couleurs -> Récupérer les bonnes bornes ! -> Changer quand on clique !
- * - Problème matrice Andrano ! -> Requête trop longue
+ * - Problème matrice Andrano ! -> Requête trop longue ?
  * - loadata seulement quand on clique sur un élément
+ * - REVOIR LA REQUETE !
+ * - Tester si la valeur est nulle
+ * - Nettoyage des fonctiosn côté serveur !
  */

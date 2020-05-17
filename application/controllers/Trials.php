@@ -669,15 +669,32 @@ class Trials extends MY_Controller
         $ajaxData = array(); //tableau qui sera retourné
         $trialCode =  json_decode($this->input->post('trialCode'));
         $factors =  json_decode($this->input->post('factors'));
-        $obs_value =  json_decode($this->input->post('obs_value'));
+        // $obs_value =  json_decode($this->input->post('obs_value'));
 
         // Récupération des valeurs de la variable à observer
-        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value);
-        else $expValues = [];
+        // if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value);
+        // else $expValues = [];
 
         // Récupération de la hiérarchie (blocs/parcelles...)
         $expData = $this->Trial_model->get_trial_hierarchy_data($trialCode, $factors);
         $ajaxData['expData'] = $expData;
+        // $ajaxData['expValues'] = $expValues;
+
+        echo json_encode($ajaxData);
+    }
+
+    public function ajaxLoadValuesForAnimatedMap()
+    {
+        $ajaxData = array(); //tableau qui sera retourné
+        $trialCode =  json_decode($this->input->post('trialCode'));
+        $obs_value =  json_decode($this->input->post('obs_value'));
+        $parent_name = json_decode($this->input->post('parent_name'));
+
+        // Récupération des valeurs de la variable à observer
+        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values2($trialCode, $obs_value, $parent_name);
+        else $expValues = [];
+
+        // Récupération de la hiérarchie (blocs/parcelles...)
         $ajaxData['expValues'] = $expValues;
 
         echo json_encode($ajaxData);

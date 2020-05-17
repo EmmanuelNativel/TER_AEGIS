@@ -1,5 +1,4 @@
 (function (d3) {
-  let hierarchy = {}; // Hiérarchie générale pour les facteurs choisis
   let obs_values = []; // Les valeurs observées pour les facteurs et la variable choisie
   let VALUES = [];
   let selected_date = null; // La date sélectionnée
@@ -20,6 +19,7 @@
   const MAX_COLOR = "#186A3B";
   const DEFAULT_COLOR = "#17202A";
   const BACKGROUND_COLOR = "#AAB7B8";
+  const NULL_COLOR = "yellow";
   let path = [];
 
   /**
@@ -56,7 +56,7 @@
     selectedVariable = selectedValue;
     //Lors de la séléction/désélection d'une variable, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-    onChange(() => drawSlider(dateMin, dateMax));
+    onChange(/*() => drawSlider(dateMin, dateMax)*/);
   });
 
   function onChange(optionalCallback = () => {}) {
@@ -66,8 +66,7 @@
       );
     } else {
       drawSVG();
-      loadData(() => {
-        updateValues(selected_date);
+      loadHierarchy(() => {
         drawChildren(current_element.children);
         getPath(current_element);
         optionalCallback();
@@ -93,12 +92,12 @@
       .attr("width", globalDiv.style("width"))
       .attr("height", globalDiv.style("width"))
       .style("background-color", BACKGROUND_COLOR)
-      // .style("border", "1px solid red")
+      .style("border", "1px solid red")
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
 
-  function loadData(onSuccessCallback) {
+  function loadHierarchy(onSuccessCallback) {
     $.ajax({
       url: SiteURL + "/Trials/ajaxLoadDataForAnimatedMap/",
       data: {
@@ -110,11 +109,29 @@
       dataType: "json",
       success: function (response) {
         const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
-        hierarchy = root; // Stockage de la hiérarchie
         current_element = root; // On indique l'élément courant
+        // VALUES = response.expValues;
+        // obs_values = prepareValues(response.expValues); // Préparation des valeurs
+        // current_values = JSON.parse(JSON.stringify(obs_values));
+        onSuccessCallback(); // On va afficher les enfants de l'élément courant
+      },
+    });
+  }
+
+  function loadValues(parentName, onSuccessCallback) {
+    $.ajax({
+      url: SiteURL + "/Trials/ajaxLoadValuesForAnimatedMap/",
+      data: {
+        trialCode: JSON.stringify(trialCode),
+        obs_value: JSON.stringify(selectedVariable),
+        parent_name: JSON.stringify(parentName),
+      },
+      type: "POST",
+      dataType: "json",
+      success: function (response) {
         VALUES = response.expValues;
         obs_values = prepareValues(response.expValues); // Préparation des valeurs
-        current_values = JSON.parse(JSON.stringify(obs_values));
+        current_values = JSON.parse(JSON.stringify(obs_values)); // UTIL ? meme chose que obs_values
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -180,9 +197,6 @@
       children: hierarchy,
     };
 
-    // const pack = (d) => d3.pack().size([0, 0]).padding(2)(d3.hierarchy(d));
-    // const root = pack(data);
-
     const root = d3.hierarchy(data);
 
     return root;
@@ -204,16 +218,22 @@
 
     data = data.map((d) => {
       const parsedDate = parseDate(d.date); // Parsing des dates
-      allDates.push(parsedDate); // Récupération de toutes les dates
-      allValues.push(d.value); // Récupération de toutes les dates
+      if (d.date !== null) {
+        allDates.push(parsedDate); // Récupération de toutes les dates
+      }
+      if (d.value !== null) allValues.push(d.value); // Récupération de toutes les valeurs
       return { ...d, date: parsedDate };
     });
 
-    dateMin = d3.min(allDates); // Récupération de la date la plus ancienne
-    dateMax = d3.max(allDates); // Récupération de la date la plus récente
+    if (allDates.length > 0) {
+      dateMin = d3.min(allDates); // Récupération de la date la plus ancienne
+      dateMax = d3.max(allDates); // Récupération de la date la plus récente
+    }
 
-    valueMin = Math.ceil(d3.min(allValues)); // Récupération de la date la plus ancienne
-    valueMax = Math.ceil(d3.max(allValues)); // Récupération de la date la plus récente
+    if (allValues.length > 0) {
+      valueMin = Math.ceil(d3.min(allValues)); // Récupération de la date la plus ancienne
+      valueMax = Math.ceil(d3.max(allValues)); // Récupération de la date la plus récente
+    }
 
     selected_date = dateMin;
 
@@ -261,20 +281,23 @@
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
       .attr("id", (d, i) => "sqr_" + i)
-      .attr("fill", (d) =>
-        d.depth > 1
-          ? squareColor(Number(current_values[d.data.exp_unit_id].value))
-          : DEFAULT_COLOR
-      )
+      .attr("fill", (d) => {
+        if (d.depth > 1) {
+          const exp = current_values[d.data.exp_unit_id];
+          const value = exp ? exp.value : null;
+          return value === null ? NULL_COLOR : squareColor(Number(value));
+        } else return DEFAULT_COLOR;
+      })
       .on("click", (d, i) => {
-        console.log("Data", d);
-        console.log("current_values", current_values);
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
-          getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
-          // drawChildren(current_element.children); // On affiche les enfants de l'élément courant
-          AnimationZoom(i, current_element.children); //ajout Animation zoom
-          getPath(d);
+          loadValues(current_element.data.name, () => {
+            updateValues(selected_date);
+            getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
+            AnimationZoom(i, current_element.children); //ajout Animation zoom
+            drawSlider(dateMin, dateMax);
+            getPath(d);
+          });
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
       });
 
@@ -283,15 +306,15 @@
     labels
       .enter()
       .append("text")
-      .text((d) =>
-        d.depth > 1
-          ? current_values[d.data.exp_unit_id].value +
-            " " +
-            d.data.exp_unit_id +
-            " " +
-            d.data.name
-          : d.data.name
-      )
+      .text((d) => {
+        if (d.depth > 1) {
+          const exp = current_values[d.data.exp_unit_id];
+          const value = exp ? exp.value : null;
+          return value === null
+            ? "Aucune valeur"
+            : value + " " + d.data.exp_unit_id + " " + d.data.name;
+        } else return d.data.name;
+      })
       .attr("x", (d, i) => {
         return (i % maxRectInLine) * rectWidth + rectWidth / 2;
       })
@@ -324,6 +347,7 @@
 
     var formatDateIntoMY = d3.timeFormat("%m/%Y");
     var formatDate = d3.timeFormat("%b %Y");
+    var formatDateComplet = d3.timeFormat("%d-%m-%Y");
 
     var svgSlider = d3
       .select("#slider")
@@ -331,72 +355,81 @@
       .attr("width", width + margin.left + margin.right)
       .attr("height", height);
 
-    var x = d3.scaleTime().domain([dMin, dMax]).range([0, width]).clamp(true);
+    if (dMin === dMax) {
+      svgSlider
+        .append("text")
+        .style("color", "black")
+        .attr("text-anchor", "middle")
+        .text("Date : " + formatDateComplet(dMin))
+        .attr("x", 70)
+        .attr("y", height / 2);
+    } else {
+      var x = d3.scaleTime().domain([dMin, dMax]).range([0, width]).clamp(true);
 
-    var slider = svgSlider
-      .append("g")
-      .attr("class", "slider")
-      .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
+      var slider = svgSlider
+        .append("g")
+        .attr("class", "slider")
+        .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
 
-    slider
-      .append("line")
-      .attr("class", "track")
-      .attr("x1", x.range()[0])
-      .attr("x2", x.range()[1])
-      .select(function () {
-        return this.parentNode.appendChild(this.cloneNode(true));
-      })
-      .attr("class", "track-inset")
-      .select(function () {
-        return this.parentNode.appendChild(this.cloneNode(true));
-      })
-      .attr("class", "track-overlay")
-      .call(
-        d3
-          .drag()
-          .on("start.interrupt", function () {
-            slider.interrupt();
-          })
-          .on("start drag", function () {
-            update(x.invert(d3.event.x));
-          })
-      );
+      slider
+        .append("line")
+        .attr("class", "track")
+        .attr("x1", x.range()[0])
+        .attr("x2", x.range()[1])
+        .select(function () {
+          return this.parentNode.appendChild(this.cloneNode(true));
+        })
+        .attr("class", "track-inset")
+        .select(function () {
+          return this.parentNode.appendChild(this.cloneNode(true));
+        })
+        .attr("class", "track-overlay")
+        .call(
+          d3
+            .drag()
+            .on("start.interrupt", function () {
+              slider.interrupt();
+            })
+            .on("start drag", function () {
+              update(x.invert(d3.event.x));
+            })
+        );
 
-    slider
-      .insert("g", ".track-overlay")
-      .attr("class", "ticks")
-      .attr("transform", "translate(0," + 18 + ")")
-      .selectAll("text")
-      // .data(x.ticks(10))
-      .enter()
-      .append("text")
-      .attr("x", x)
-      // .attr("y", 10)
-      .attr("text-anchor", "middle")
-      .text(function (d) {
-        return formatDateIntoMY(d);
-      });
+      slider
+        .insert("g", ".track-overlay")
+        .attr("class", "ticks")
+        .attr("transform", "translate(0," + 18 + ")")
+        .selectAll("text")
+        // .data(x.ticks(10))
+        .enter()
+        .append("text")
+        .attr("x", x)
+        // .attr("y", 10)
+        .attr("text-anchor", "middle")
+        .text(function (d) {
+          return formatDateIntoMY(d);
+        });
 
-    var handle = slider
-      .insert("circle", ".track-overlay")
-      .attr("class", "handle")
-      .attr("r", 9);
+      var handle = slider
+        .insert("circle", ".track-overlay")
+        .attr("class", "handle")
+        .attr("r", 9);
 
-    var label = slider
-      .append("text")
-      .attr("class", "label")
-      .attr("text-anchor", "middle")
-      .text(formatDate(dMin))
-      .attr("transform", "translate(0," + -25 + ")");
+      var label = slider
+        .append("text")
+        .attr("class", "label")
+        .attr("text-anchor", "middle")
+        .text(formatDate(dMin))
+        .attr("transform", "translate(0," + -25 + ")");
 
-    function update(h) {
-      // update position and text of label according to slider scale
-      handle.attr("cx", x(h));
-      label.attr("x", x(h)).text(formatDate(h));
-
-      selected_date = h;
-      updateValues(selected_date);
-      drawChildren(current_element.children);
+      function update(h) {
+        // update position and text of label according to slider scale
+        handle.attr("cx", x(h));
+        label.attr("x", x(h)).text(formatDate(h));
+        selected_date = h;
+        updateValues(selected_date);
+        drawChildren(current_element.children);
+      }
     }
   }
 
