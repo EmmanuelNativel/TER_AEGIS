@@ -340,6 +340,7 @@
       .attr("y", (d, i) => {
         return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
       })
+      .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "11px")
       .attr("fill", "red")
       .attr("text-anchor", "middle");
@@ -492,15 +493,10 @@
   //animation zoom
   function AnimationZoom(id, data) {
     var selectSqr = d3.select("#sqr_" + id);
-
-    // var squareColor = d3
-    //   .scaleLinear()
-    //   .domain([valueMin, valueMax])
-    //   .range([MIN_COLOR, MAX_COLOR]);
-
-    // selectSqr.attr("fill", ZOOM_COLOR);
+    var selectLabel = d3.select("#label_" + id); // LABELS
 
     selectSqr.raise(); //On met le carré au premier plan
+    selectLabel.raise();
     selectSqr
       .transition()
       .duration(1000)
@@ -508,15 +504,21 @@
       .attr("y", 0)
       .attr("width", WIDTH)
       .attr("height", HEIGHT)
-      .attr("fill", BACKGROUND_COLOR)
-
-      //ajout de la couleur suivante
-      // .attr("fill", () => {
-      //       squareColor(Number(current_values[data.data.exp_unit_id].value))
-      // })
+      .on("start", (d) => {
+        svgAnimation.selectAll("rect").attr("opacity", 0);
+        svgAnimation.selectAll("text").attr("opacity", 0);
+        selectSqr.attr("opacity", 100);
+        selectLabel.attr("opacity", 100);
+      })
       .on("end", () => {
-        //Attend la fin de l'animation
         drawChildren(data); // On affiche les enfants de l'élément courant
       });
+
+    selectLabel
+      .transition()
+      .duration(1000)
+      .attr("x", WIDTH / 2)
+      .attr("y", HEIGHT / 2)
+      .attr("font-size", "50px");
   }
 })(d3);
