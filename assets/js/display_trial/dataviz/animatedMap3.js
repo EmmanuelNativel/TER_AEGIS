@@ -17,8 +17,8 @@
   let svgAnimation = null; // SVG contenant l'animation
   const MIN_COLOR = "#EAFAF1";
   const MAX_COLOR = "#186A3B";
-  const DEFAULT_COLOR = "#17202A";
-  const BACKGROUND_COLOR = "#AAB7B8";
+  const DEFAULT_COLOR = "rgba(23,32,42,1)";
+  const BACKGROUND_COLOR = "rgba(170,183,184,1)";
   const NULL_COLOR = "yellow";
   let path = [];
 
@@ -67,7 +67,7 @@
     } else {
       drawSVG();
       loadHierarchy(() => {
-        drawChildren(current_element.children);
+        drawChildren(current_element.children, true);
         getPath(current_element);
         optionalCallback();
       });
@@ -82,7 +82,7 @@
     var globalDiv = d3.select(globalDivEl);
     globalDiv.html("");
 
-    const margin = { top: 0, right: 0, bottom: 0, left: 0 };
+    // const margin = { top: 0, right: 0, bottom: 0, left: 0 };
 
     //Création du svg de la visualisation
     svgAnimation = globalDiv
@@ -91,10 +91,10 @@
       // .attr("height", HEIGHT + margin.bottom + margin.top + 50)
       .attr("width", globalDiv.style("width"))
       .attr("height", globalDiv.style("width"))
-      .style("background-color", BACKGROUND_COLOR)
-      .style("border", "1px solid red")
-      .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      .style("background-color", BACKGROUND_COLOR);
+    // .style("border", "1px solid red")
+    // .append("g")
+    // .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
 
   function loadHierarchy(onSuccessCallback) {
@@ -263,13 +263,13 @@
       .on("click", (d) => {
         if (d === current_element) return;
         current_element = d;
-        drawChildren(d.children);
+        drawChildren(d.children, true);
         getPath(current_element);
         console.log(path);
       });
   }
 
-  function drawChildren(elements) {
+  function drawChildren(elements, animation = false) {
     svgAnimation.selectAll("rect").remove(); // On efface les anciens éléments
     svgAnimation.selectAll("text").remove(); // On efface les anciens labels
 
@@ -292,13 +292,15 @@
       .enter()
       .append("rect")
       .attr("x", (d, i) => {
-        return (i % maxRectInLine) * rectWidth;
+        return animation ? 0 : (i % maxRectInLine) * rectWidth;
       })
       .attr("y", (d, i) => {
         return Math.trunc(i / maxRectInLine) * rectHeight;
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
+      .attr("rx", 15)
+      .attr("ry", 15)
       .attr("id", (d, i) => "sqr_" + i)
       .attr("fill", (d) => {
         if (d.depth > 1) {
@@ -320,6 +322,16 @@
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
       });
 
+    if (animation) {
+      svgAnimation
+        .selectAll("rect")
+        .transition()
+        .duration(500)
+        .attr("x", (d, i) => {
+          return (i % maxRectInLine) * rectWidth;
+        });
+    }
+
     var labels = svgAnimation.selectAll("text").data(elements);
 
     labels
@@ -335,7 +347,7 @@
         } else return d.data.name;
       })
       .attr("x", (d, i) => {
-        return (i % maxRectInLine) * rectWidth + rectWidth / 2;
+        return animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2;
       })
       .attr("y", (d, i) => {
         return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
@@ -344,6 +356,16 @@
       .attr("font-size", "11px")
       .attr("fill", "red")
       .attr("text-anchor", "middle");
+
+    if (animation) {
+      svgAnimation
+        .selectAll("text")
+        .transition()
+        .duration(500)
+        .attr("x", (d, i) => {
+          return (i % maxRectInLine) * rectWidth + rectWidth / 2;
+        });
+    }
   }
 
   /**
@@ -499,7 +521,7 @@
     selectLabel.raise();
     selectSqr
       .transition()
-      .duration(1000)
+      .duration(500)
       .attr("x", 0)
       .attr("y", 0)
       .attr("width", WIDTH)
@@ -514,12 +536,12 @@
         selectLabel.attr("opacity", 100);
       })
       .on("end", () => {
-        drawChildren(data); // On affiche les enfants de l'élément courant
+        drawChildren(data, true); // On affiche les enfants de l'élément courant
       });
 
     selectLabel
       .transition()
-      .duration(1000)
+      .duration(500)
       .attr("x", WIDTH / 2)
       .attr("y", HEIGHT / 2)
       .attr("font-size", "50px")
