@@ -55,8 +55,9 @@
     ?>
   </div>
 
-  <div class="row">
-    <div id="slider"></div>
+  <div class="row d-flex flex-row align-items-center">
+    <div id="slider" style="display:inline-block"></div>
+    <button type="button" class="btn" id="sliderButton"><i class="fa fa-play"></i></button>
   </div>
 
   <div class="row">

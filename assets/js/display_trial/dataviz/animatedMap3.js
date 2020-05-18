@@ -391,11 +391,21 @@
     var formatDate = d3.timeFormat("%b %Y");
     var formatDateComplet = d3.timeFormat("%d-%m-%Y");
 
+    var moving = false;
+    var currentValue = 0;
+    var targetValue = width;
+
     var svgSlider = d3
       .select("#slider")
       .append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height);
+
+    var sliderButton = d3.select("#sliderButton");
+
+    sliderButton.on("click", () => {
+      animationSlider();
+    });
 
     if (dMin === dMax) {
       svgSlider
@@ -431,6 +441,9 @@
             .drag()
             .on("start.interrupt", function () {
               slider.interrupt();
+              moving = false;
+              clearInterval(timer);
+              sliderButton.select("i").attr("class", "fa fa-play");
             })
             .on("start drag", function () {
               update(x.invert(d3.event.x));
@@ -442,11 +455,9 @@
         .attr("class", "ticks")
         .attr("transform", "translate(0," + 18 + ")")
         .selectAll("text")
-        // .data(x.ticks(10))
         .enter()
         .append("text")
         .attr("x", x)
-        // .attr("y", 10)
         .attr("text-anchor", "middle")
         .text(function (d) {
           return formatDateIntoMY(d);
@@ -464,11 +475,35 @@
         .text(formatDate(dMin))
         .attr("transform", "translate(0," + -25 + ")");
 
+      function animationSlider() {
+        if (moving) {
+          moving = false;
+          clearInterval(timer);
+          sliderButton.select("i").attr("class", "fa fa-play");
+        } else {
+          moving = true;
+          timer = setInterval(step, 100);
+          sliderButton.select("i").attr("class", "fa fa-pause");
+        }
+      }
+
+      function step() {
+        update(x.invert(currentValue));
+        currentValue = currentValue + targetValue / 151;
+        if (currentValue > targetValue) {
+          moving = false;
+          currentValue = 0;
+          clearInterval(timer);
+          sliderButton.select("i").attr("class", "fa fa-play");
+        }
+      }
+
       function update(h) {
         // update position and text of label according to slider scale
         handle.attr("cx", x(h));
         label.attr("x", x(h)).text(formatDate(h));
         selected_date = h;
+        if (!moving) currentValue = x(h);
         updateValues(selected_date);
         drawChildren(current_element.children);
       }

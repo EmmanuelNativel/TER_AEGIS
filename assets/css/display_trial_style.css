@@ -206,6 +206,10 @@ table.dataTable thead .sorting_desc::after {
   stroke-width: 1.25px;
 }
 
+/*==============================================================================
+                                  AnimatedMap
+==============================================================================*/
+
 /* TEST */
 
 .ticks {
@@ -241,4 +245,14 @@ table.dataTable thead .sorting_desc::after {
   stroke: #000;
   stroke-opacity: 0.5;
   stroke-width: 1.25px;
+}
+
+/* Slider */
+
+#sliderButton{
+  border: "2px solid green";
+}
+
+#slider{
+  border: "1px solid red";
 }
