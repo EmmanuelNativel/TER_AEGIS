@@ -15,10 +15,11 @@
   let WIDTH = document.getElementById(div_id).clientWidth;
   let HEIGHT = document.getElementById(div_id).clientWidth;
   let svgAnimation = null; // SVG contenant l'animation
-  const MIN_COLOR = "#EAFAF1";
-  const MAX_COLOR = "#186A3B";
+  const MIN_COLOR = "#7DCEA0";
+  const MAX_COLOR = "#196F3D";
   const DEFAULT_COLOR = "rgba(23,32,42,1)";
-  const BACKGROUND_COLOR = "rgba(170,183,184,1)";
+  const BACKGROUND_COLOR = "#784212";
+  const LABEL_COLOR = "white";
   const NULL_COLOR = "yellow";
   let path = [];
 
@@ -130,8 +131,10 @@
       dataType: "json",
       success: function (response) {
         VALUES = response.expValues;
+        console.log("VALUES", VALUES);
         obs_values = prepareValues(response.expValues); // Préparation des valeurs
-        current_values = JSON.parse(JSON.stringify(obs_values)); // UTIL ? meme chose que obs_values
+        current_values = JSON.parse(JSON.stringify(obs_values));
+        console.log("current_values", current_values);
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -309,6 +312,8 @@
           return value === null ? NULL_COLOR : squareColor(Number(value));
         } else return DEFAULT_COLOR;
       })
+      // .style("stroke-width", "1")
+      // .style("stroke", "white")
       .on("click", (d, i) => {
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
@@ -354,7 +359,7 @@
       })
       .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "11px")
-      .attr("fill", "red")
+      .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle");
 
     if (animation) {

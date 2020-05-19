@@ -306,13 +306,15 @@ class Trial_model extends MY_Model
       "e2.unit_code as parent_unit_code",
       "ob.obs_value as value",
       "ob.obs_date as date",
-      "ob.obs_variable as variable"
+      "ob.obs_variable as variable",
+      "v.scale_code as unite"
     );
 
     return $this->db->select($select)
       ->from("exp_unit e")
       ->join("exp_unit e2", "e2.exp_unit_id = e.assigned_to")
-      ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id ")
+      ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id")
+      ->join("variable v", "v.variable_code = ob.obs_variable")
       ->where("e.trial_code", $trial_code)
       ->where("e2.unit_code", $parent_name)
       ->where_in("e.level_label", array('plot', 'parcelle'))
