@@ -131,10 +131,8 @@
       dataType: "json",
       success: function (response) {
         VALUES = response.expValues;
-        console.log("VALUES", VALUES);
         obs_values = prepareValues(response.expValues); // Préparation des valeurs
         current_values = JSON.parse(JSON.stringify(obs_values));
-        console.log("current_values", current_values);
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -346,9 +344,10 @@
         if (d.depth > 1) {
           const exp = current_values[d.data.exp_unit_id];
           const value = exp ? exp.value : null;
+          const unite = exp ? exp.unite : null;
           return value === null
             ? "Aucune valeur"
-            : value + " " + d.data.exp_unit_id + " " + d.data.name;
+            : d.data.name + " : " + value + " " + unite;
         } else return d.data.name;
       })
       .attr("x", (d, i) => {
@@ -358,7 +357,7 @@
         return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
       })
       .attr("id", (d, i) => "label_" + i)
-      .attr("font-size", "11px")
+      .attr("font-size", "15px")
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle");
 
