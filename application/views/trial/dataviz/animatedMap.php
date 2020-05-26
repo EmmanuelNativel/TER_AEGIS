@@ -55,18 +55,15 @@
     ?>
   </div>
 
-  <div class="row d-flex flex-row align-items-center">
-    <div id="slider" style="display:inline-block"></div>
-    <button type="button" class="btn" id="sliderButton"><i class="fa fa-play"></i></button>
+  <div class="row" style="display:flex; flex-direction:row; align-items:center;">
+    <div id="slider"></div>
+    <button type="button" class="btn" id="sliderButton" style="margin-bottom:5px;"><i class="fa fa-play"></i></button>
   </div>
 
   <div class="row">
     <div class="light-font">
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb" id="breadcrumb">
-          <!-- <li class="breadcrumb-item"><a class="white-text" href="#">Home</a></li> -->
-          <!-- <li class="breadcrumb-item"><a class="white-text" href="#">Library</a></li> -->
-          <!-- <li class="breadcrumb-item active">Data</li> -->
         </ol>
       </nav>
     </div>

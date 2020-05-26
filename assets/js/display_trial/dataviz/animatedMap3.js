@@ -20,7 +20,7 @@
   const DEFAULT_COLOR = "rgba(23,32,42,1)";
   const BACKGROUND_COLOR = "#784212";
   const LABEL_COLOR = "white";
-  const NULL_COLOR = "yellow";
+  const NULL_COLOR = "#ACBD32"; // yellow
   let path = [];
 
   /**
@@ -259,20 +259,23 @@
     breadcrumb
       .enter()
       .append("li")
-      .attr("class", "breadcrumb-item")
+      .attr("class", (d, i) =>
+        i === path.length - 1 ? "breadcrumb-item active" : "breadcrumb-item"
+      )
       .html((d) => "<a  class='white-text'>" + d.data.name + "</a>")
       .on("click", (d) => {
         if (d === current_element) return;
         current_element = d;
+        drawSlider(dateMin, dateMax);
         drawChildren(d.children, true);
         getPath(current_element);
-        console.log(path);
       });
   }
 
   function drawChildren(elements, animation = false) {
     svgAnimation.selectAll("rect").remove(); // On efface les anciens éléments
     svgAnimation.selectAll("text").remove(); // On efface les anciens labels
+    svgAnimation.selectAll(".tspan").remove();
 
     const nb = elements.length; // Le nombre d'éléments à insérer
     const maxRectInLine = Math.ceil(Math.sqrt(nb)); // Le nombre maximum d'éléments par ligne
@@ -310,8 +313,6 @@
           return value === null ? NULL_COLOR : squareColor(Number(value));
         } else return DEFAULT_COLOR;
       })
-      // .style("stroke-width", "1")
-      // .style("stroke", "white")
       .on("click", (d, i) => {
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
@@ -335,40 +336,96 @@
         });
     }
 
-    var labels = svgAnimation.selectAll("text").data(elements);
+    drawLabels(elements, maxRectInLine, rectWidth, rectHeight, animation);
+  }
 
-    labels
+  function drawLabels(
+    elements,
+    maxRectInLine,
+    rectWidth,
+    rectHeight,
+    animation
+  ) {
+    var labels = svgAnimation
+      .selectAll("text")
+      .data(elements)
       .enter()
-      .append("text")
+      .append("text");
+
+    // NAME
+    labels
+      .append("tspan")
+      .text((d) => d.data.name)
+      .attr("x", (d, i) =>
+        animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
+      )
+      .attr(
+        "y",
+        (d, i) => Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2
+      )
+      .attr("id", (d, i) => "label_" + i)
+      .attr("font-size", "15px")
+      .attr("fill", LABEL_COLOR)
+      .attr("text-anchor", "middle");
+    // .attr("class", "tspan");
+
+    // FACTOR LEVEL
+    labels
+      .append("tspan")
+      .text((d) => {
+        if (d.depth > 1) {
+          return d.data.factor_level;
+        }
+      })
+      .attr("x", (d, i) =>
+        animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
+      )
+      .attr(
+        "y",
+        (d, i) =>
+          Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 25
+      )
+      // .attr("id", (d, i) => "label_" + i)
+      .attr("font-size", "15px")
+      .attr("fill", LABEL_COLOR)
+      .attr("text-anchor", "middle")
+      .attr("class", "tspan");
+
+    // VALUES
+    labels
+      .append("tspan")
       .text((d) => {
         if (d.depth > 1) {
           const exp = current_values[d.data.exp_unit_id];
           const value = exp ? exp.value : null;
           const unite = exp ? exp.unite : null;
-          return value === null
-            ? "Aucune valeur"
-            : d.data.name + " : " + value + " " + unite;
-        } else return d.data.name;
+          return value === null ? "Aucune valeur" : value + "" + unite;
+        }
       })
-      .attr("x", (d, i) => {
-        return animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2;
-      })
-      .attr("y", (d, i) => {
-        return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
-      })
-      .attr("id", (d, i) => "label_" + i)
+      .attr("x", (d, i) =>
+        animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
+      )
+      .attr(
+        "y",
+        (d, i) =>
+          Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 50
+      )
+      // .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "15px")
       .attr("fill", LABEL_COLOR)
-      .attr("text-anchor", "middle");
+      .attr("text-anchor", "middle")
+      .attr("class", "tspan");
 
     if (animation) {
-      svgAnimation
-        .selectAll("text")
-        .transition()
-        .duration(500)
-        .attr("x", (d, i) => {
-          return (i % maxRectInLine) * rectWidth + rectWidth / 2;
-        });
+      svgAnimation.selectAll("text").each(function (d, i) {
+        d3.select(this)
+          .selectAll("tspan")
+          .transition()
+          .duration(500)
+          .attr("x", (d, j) => {
+            return (i % maxRectInLine) * rectWidth + rectWidth / 2;
+          });
+      });
     }
   }
 
@@ -387,9 +444,24 @@
     // On efface le slider
     $("#slider").html("");
 
+    var sliderButton = d3.select("#sliderButton");
+
+    if (
+      !current_values.hasOwnProperty(
+        current_element.children[0].data.exp_unit_id
+      )
+    ) {
+      clearInterval(timer);
+      sliderButton.select("i").attr("class", "fa fa-play");
+      //   .style("display", "none");
+      return;
+    }
+
+    // sliderButton.style("display", "inline-block");
+
     var margin = { top: 0, right: 50, bottom: 0, left: 50 };
     var width = 500;
-    var height = 150;
+    var height = 100;
 
     var formatDateIntoMY = d3.timeFormat("%m/%Y");
     var formatDate = d3.timeFormat("%b %Y");
@@ -404,8 +476,6 @@
       .append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height);
-
-    var sliderButton = d3.select("#sliderButton");
 
     sliderButton.on("click", () => {
       animationSlider();
@@ -484,6 +554,7 @@
           moving = false;
           clearInterval(timer);
           sliderButton.select("i").attr("class", "fa fa-play");
+          // sliderButton.attr("class", "btn-success")
         } else {
           moving = true;
           timer = setInterval(step, 100);
@@ -555,9 +626,13 @@
   function AnimationZoom(id, data) {
     var selectSqr = d3.select("#sqr_" + id);
     var selectLabel = d3.select("#label_" + id); // LABELS
+    var selectTextZone = selectLabel.select(function () {
+      return this.parentNode;
+    });
 
     selectSqr.raise(); //On met le carré au premier plan
-    selectLabel.raise();
+    selectTextZone.raise();
+
     selectSqr
       .transition()
       .duration(500)
@@ -570,7 +645,7 @@
       .style("opacity", 0)
       .on("start", (d) => {
         svgAnimation.selectAll("rect").attr("opacity", 0);
-        svgAnimation.selectAll("text").attr("opacity", 0);
+        selectTextZone.selectAll("tspan").attr("opacity", 0);
         selectSqr.attr("opacity", 100);
         selectLabel.attr("opacity", 100);
       })
@@ -586,6 +661,13 @@
       .attr("font-size", "50px")
       .transition()
       .duration(500)
-      .style("opacity", 0);
+      .style("opacity", 0)
+      .on("start", (d) => {
+        svgAnimation.selectAll("text").remove(); // On efface les anciens labels
+        svgAnimation.selectAll(".label").remove();
+      })
+      .on("end", (d) => {
+        selectLabel.remove();
+      });
   }
 })(d3);
