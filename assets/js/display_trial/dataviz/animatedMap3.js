@@ -23,6 +23,19 @@
   const NULL_COLOR = "#ACBD32"; // yellow
   let path = [];
 
+  var div = d3
+    .select("body")
+    .append("div")
+    .attr("class", "tooltip")
+    .style("width", "200px")
+    .style("opacity", 0)
+    .style("position", "absolute")
+    .style("text-align", "center")
+    .style("padding", "10px")
+    .style("border", "2px solid black")
+    .style("border-radius", "5px")
+    .style("background", "white");
+
   /**
    * Sélection des facteurs :
    * Handler pour la selection des facteurs
@@ -324,6 +337,42 @@
             getPath(d);
           });
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
+      })
+      .on("mouseover", (d, i) => {
+        if (d.depth > 1) {
+          //coordornné x,y en fonction de la svg
+          var x = (i % maxRectInLine) * rectWidth + rectWidth / 2 - rectPadding;
+          var y = Math.trunc(i / maxRectInLine) * rectHeight + rectHeight;
+
+          var div_main = document.getElementById("expUnitGraph");
+          //conversion des coordornée x,y
+          x =
+            x +
+            div_main.offsetLeft -
+            Math.round(div.style("width").slice(0, -2)) / 2;
+          y =
+            y +
+            div_main.offsetTop -
+            Math.round(div.style("height").slice(0, -2)) / 2;
+
+          div
+            .transition()
+            .duration(200)
+            .style("opacity", 0.9)
+            .on("start", () => {
+              div
+                .html(
+                  "Description : " + "<br/>" + d.data.factor_level_description
+                )
+                .style("left", x + "px")
+                .style("top", y + "px");
+            });
+        }
+      })
+      .on("mouseout", (d, i) => {
+        if (d.depth > 1) {
+          div.transition().duration(300).style("opacity", 0);
+        }
       });
 
     if (animation) {
@@ -346,11 +395,15 @@
     rectHeight,
     animation
   ) {
+    const rectPadding = 2;
+
     var labels = svgAnimation
       .selectAll("text")
       .data(elements)
       .enter()
-      .append("text");
+      .append("text")
+      .attr("width", rectWidth)
+      .attr("height", rectHeight);
 
     // NAME
     labels
@@ -385,7 +438,6 @@
         (d, i) =>
           Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 25
       )
-      // .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "15px")
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle")
@@ -410,11 +462,52 @@
         (d, i) =>
           Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 50
       )
-      // .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "15px")
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle")
       .attr("class", "tspan");
+      
+    // AFFICHAGE DES DESCRIPTIONS
+    labels
+      .on("mouseover", (d, i) => {
+        if (d.depth > 1) {
+          //coordornné x,y en fonction de la svg
+          var x = (i % maxRectInLine) * rectWidth + rectWidth / 2 - rectPadding;
+          var y = Math.trunc(i / maxRectInLine) * rectHeight + rectHeight;
+
+          var div_main = document.getElementById("expUnitGraph");
+          //conversion des coordornée x,y
+          x =
+            x +
+            div_main.offsetLeft -
+            Math.round(div.style("width").slice(0, -2)) / 2;
+          y =
+            y +
+            div_main.offsetTop -
+            Math.round(div.style("height").slice(0, -2)) / 2;
+
+          div
+            .transition()
+            .duration(200)
+            .style("opacity", 0.9)
+            .on("start", () => {
+              div
+                .html(
+                  "Description : " + "<br/>" + d.data.factor_level_description
+                )
+                .style("left", x + "px")
+                .style("top", y + "px");
+            });
+        }
+      })
+      .on("mouseout", (d, i) => {
+        if (d.depth > 1) {
+          d3.selectAll(".tooltip")
+            .transition()
+            .duration(200)
+            .style("opacity", 0);
+        }
+      });
 
     if (animation) {
       svgAnimation.selectAll("text").each(function (d, i) {
@@ -445,6 +538,7 @@
     $("#slider").html("");
 
     var sliderButton = d3.select("#sliderButton");
+    var timer = null;
 
     if (
       !current_values.hasOwnProperty(
@@ -453,11 +547,8 @@
     ) {
       clearInterval(timer);
       sliderButton.select("i").attr("class", "fa fa-play");
-      //   .style("display", "none");
       return;
     }
-
-    // sliderButton.style("display", "inline-block");
 
     var margin = { top: 0, right: 50, bottom: 0, left: 50 };
     var width = 500;
