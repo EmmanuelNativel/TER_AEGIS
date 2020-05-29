@@ -12,8 +12,8 @@
   let selectedFactors = []; // Liste des facteurs sélectionnés
   let selectedVariable = null; // La valeur à observer sélectionnée
   const div_id = "expUnitGraph";
-  let WIDTH = document.getElementById(div_id).clientWidth;
-  let HEIGHT = document.getElementById(div_id).clientWidth;
+  let WIDTH = document.getElementById(div_id).clientWidth / 1.5;
+  let HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
   let svgAnimation = null; // SVG contenant l'animation
   const MIN_COLOR = "#7DCEA0";
   const MAX_COLOR = "#196F3D";
@@ -103,8 +103,10 @@
       .append("svg")
       // .attr("width", WIDTH + margin.left + margin.right + 5)
       // .attr("height", HEIGHT + margin.bottom + margin.top + 50)
-      .attr("width", globalDiv.style("width"))
-      .attr("height", globalDiv.style("width"))
+      .attr("width", WIDTH)
+      .attr("height", HEIGHT)
+      // .attr("width", globalDiv.style("width"))
+      // .attr("height", globalDiv.style("width"))
       .style("background-color", BACKGROUND_COLOR);
     // .style("border", "1px solid red")
     // .append("g")
@@ -419,7 +421,8 @@
       .attr("id", (d, i) => "label_" + i)
       .attr("font-size", "15px")
       .attr("fill", LABEL_COLOR)
-      .attr("text-anchor", "middle");
+      .attr("text-anchor", "middle")
+      .style("font-weight", "bold");
     // .attr("class", "tspan");
 
     // FACTOR LEVEL
@@ -451,7 +454,7 @@
           const exp = current_values[d.data.exp_unit_id];
           const value = exp ? exp.value : null;
           const unite = exp ? exp.unite : null;
-          return value === null ? "Aucune valeur" : value + "" + unite;
+          return value === null ? "Aucune valeur" : value + " " + unite;
         }
       })
       .attr("x", (d, i) =>
@@ -463,10 +466,12 @@
           Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 50
       )
       .attr("font-size", "15px")
-      .attr("fill", LABEL_COLOR)
+      .attr("fill", (d) =>
+        current_values[d.data.exp_unit_id] ? LABEL_COLOR : "red"
+      )
       .attr("text-anchor", "middle")
       .attr("class", "tspan");
-      
+
     // AFFICHAGE DES DESCRIPTIONS
     labels
       .on("mouseover", (d, i) => {
