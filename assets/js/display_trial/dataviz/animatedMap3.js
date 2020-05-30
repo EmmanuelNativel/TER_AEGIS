@@ -417,6 +417,7 @@
       .append("text");
 
     function getSize(d) {
+      const maxSize = 20;
       if (d.depth > 1) {
         // var bbox = this.getBBox(),
         // cbbox = this.parentNode.getBBox(),
@@ -424,9 +425,10 @@
           scale = ((rectWidth - 4) / textLength) * 1.1;
 
         if (scale < minTspanSize) scale = minTspanSize;
-        if (scale > maxTspanSize) scale = maxTspanSize;
+        if (scale > maxTspanSize)
+          scale = maxTspanSize > maxSize ? maxSize : maxTspanSize;
       } else {
-        var scale = 16;
+        var scale = maxSize;
       }
 
       d.scale = scale;
