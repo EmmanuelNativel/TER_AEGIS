@@ -7,7 +7,7 @@
       <p>
         <h4>Facteur(s) : </h3>
       </p>
-      <select class="selectpicker" id="factor_selectPicker" data-live-search="true" data-width="100%" data-size="5" data-title="Unité expérimentale..." data-selected-text-format="count" data-count-selected-text="{0} unit. exp. selectionnées" multiple>
+      <select class="selectpicker" id="factor_selectPicker" data-live-search="true" data-width="100%" data-size="5" data-title="Facteurs..." data-selected-text-format="count" data-count-selected-text="{0} facteurs selectionnées" multiple>
         <?php
         $factors = array();
         foreach ($all_exp_unit as $exp_unit) {

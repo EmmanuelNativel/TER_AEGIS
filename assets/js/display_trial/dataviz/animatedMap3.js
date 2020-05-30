@@ -387,7 +387,14 @@
         });
     }
 
-    drawLabels(elements, maxRectInLine, rectWidth, rectHeight, animation);
+    drawLabels(
+      elements,
+      maxRectInLine,
+      rectWidth,
+      rectHeight,
+      animation,
+      square
+    );
   }
 
   function drawLabels(
@@ -395,17 +402,35 @@
     maxRectInLine,
     rectWidth,
     rectHeight,
-    animation
+    animation,
+    square
   ) {
     const rectPadding = 2;
+    const maxNumberOfTspan = 3;
+    const maxTspanSize = (rectHeight / maxNumberOfTspan) * 0.8;
+    const minTspanSize = 7;
 
     var labels = svgAnimation
       .selectAll("text")
       .data(elements)
       .enter()
-      .append("text")
-      .attr("width", rectWidth)
-      .attr("height", rectHeight);
+      .append("text");
+
+    function getSize(d) {
+      if (d.depth > 1) {
+        // var bbox = this.getBBox(),
+        // cbbox = this.parentNode.getBBox(),
+        var textLength = d3.select(this).text().length,
+          scale = ((rectWidth - 4) / textLength) * 1.1;
+
+        if (scale < minTspanSize) scale = minTspanSize;
+        if (scale > maxTspanSize) scale = maxTspanSize;
+      } else {
+        var scale = 16;
+      }
+
+      d.scale = scale;
+    }
 
     // NAME
     labels
@@ -416,21 +441,25 @@
       )
       .attr(
         "y",
-        (d, i) => Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2
+        (d, i) => Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 4
       )
       .attr("id", (d, i) => "label_" + i)
-      .attr("font-size", "15px")
+      .attr("width", rectWidth)
+      .attr("font-size", "1rem")
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle")
-      .style("font-weight", "bold");
-    // .attr("class", "tspan");
+      .style("font-weight", "bold")
+      .each(getSize)
+      .style("font-size", function (d) {
+        return d.scale + "px";
+      });
 
     // FACTOR LEVEL
     labels
       .append("tspan")
       .text((d) => {
         if (d.depth > 1) {
-          return d.data.factor_level;
+          return d.data.factor + " : " + d.data.factor_level;
         }
       })
       .attr("x", (d, i) =>
@@ -439,12 +468,18 @@
       .attr(
         "y",
         (d, i) =>
-          Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 25
+          Math.trunc(i / maxRectInLine) * rectHeight +
+          rectHeight / 4 +
+          maxTspanSize
       )
-      .attr("font-size", "15px")
+      .attr("width", rectWidth)
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle")
-      .attr("class", "tspan");
+      .attr("class", "tspan")
+      .each(getSize)
+      .style("font-size", function (d) {
+        return d.scale + "px";
+      });
 
     // VALUES
     labels
@@ -463,14 +498,21 @@
       .attr(
         "y",
         (d, i) =>
-          Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2 + 50
+          Math.trunc(i / maxRectInLine) * rectHeight +
+          rectHeight / 4 +
+          maxTspanSize * 2
       )
-      .attr("font-size", "15px")
+      .attr("font-size", "1rem")
       .attr("fill", (d) =>
         current_values[d.data.exp_unit_id] ? LABEL_COLOR : "red"
       )
+      .attr("width", rectWidth)
       .attr("text-anchor", "middle")
-      .attr("class", "tspan");
+      .attr("class", "tspan")
+      .each(getSize)
+      .style("font-size", function (d) {
+        return d.scale + "px";
+      });
 
     // AFFICHAGE DES DESCRIPTIONS
     labels
