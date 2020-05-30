@@ -487,7 +487,7 @@
       .text((d) => {
         if (d.depth > 1) {
           const exp = current_values[d.data.exp_unit_id];
-          const value = exp ? exp.value : null;
+          const value = exp ? Number(exp.value).toFixed(2) : null;
           const unite = exp ? exp.unite : null;
           return value === null ? "Aucune valeur" : value + " " + unite;
         }
