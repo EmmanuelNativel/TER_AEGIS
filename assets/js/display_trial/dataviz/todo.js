@@ -64,8 +64,6 @@
 
 /**
  * TODO :
- * - Régler le problème des tailles
- * - Choisir entre SVG et HTML pour afficher les informations
  * - Nettoyage des fonctions côté serveur !
- * - Arrondir les valeurs
+ * - Regrouper par unité expérimentale !
  */

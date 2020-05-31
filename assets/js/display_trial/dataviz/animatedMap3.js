@@ -437,13 +437,15 @@
     // NAME
     labels
       .append("tspan")
-      .text((d) => d.data.name)
+      .text((d) => (d.depth === 1 ? d.data.name : d.data.exp_unit_id))
       .attr("x", (d, i) =>
         animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
       )
       .attr(
         "y",
-        (d, i) => Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 4
+        (d, i) =>
+          Math.trunc(i / maxRectInLine) * rectHeight +
+          rectHeight / (d.depth === 1 ? 2 : 4)
       )
       .attr("id", (d, i) => "label_" + i)
       .attr("width", rectWidth)
