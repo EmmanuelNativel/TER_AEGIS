@@ -140,6 +140,7 @@
     
     getPath(current_element);
     */
+    div.style("display", "none");
     loadValues(current_element.data.name, () => {
       updateValues(selected_date);
       getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
@@ -557,6 +558,7 @@
         drawSlider(dateMin, dateMax);
         drawChildren(d.children, true);
         getPath(current_element);
+        div.style("display", "none");
       });
   }
 
@@ -608,7 +610,6 @@
    * @param {Array} elements
    */
   function filterElements(elements) {
-    console.log("elements", elements);
     // Filtrage des éléments qui ont des valeurs
     if (elements[0].data.hasOwnProperty("factors")) {
       const res = elements.filter((d) => factorFilter(d.data.factors));
