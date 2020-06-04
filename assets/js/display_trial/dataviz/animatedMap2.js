@@ -120,26 +120,6 @@
   });
 
   /**
-   * Sélection des facteurs :
-   * Handler pour la selection des facteurs
-   */
-  // $("#factor_selectPicker").on("changed.bs.select", function (
-  //   e,
-  //   clickedIndex,
-  //   isSelected,
-  //   previousValue
-  // ) {
-  //   var selected = $(this).find("option").eq(clickedIndex);
-  //   //var selectedFactorId = selected.val();
-  //   var selecFactor = selected.text();
-  //   utils.arrayToggleValue(selectedFactors, selecFactor);
-
-  //   //Lors de la séléction/désélection d'un facteur, on (re)charge les données d'observations
-  //   // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-  //   onChange();
-  // });
-
-  /**
    * Sélection de la variable à observer :
    * Handler pour la selection de la variable à observer
    */
@@ -289,7 +269,7 @@
     return root;
   }
 
-  function prepareHierarchy(data) {
+  function prepareHierarchy2(data) {
     // Récupération des premiers enfants (les blocs)
     const reducer = (accumulator, currentValue) =>
       accumulator.add(currentValue.parent_unit_code);
@@ -354,6 +334,139 @@
     const root = d3.hierarchy(data);
 
     return root;
+  }
+
+  function prepareHierarchy(data) {
+    // Récupération des premiers enfants (les blocs)
+    const reducer1 = (accumulator, currentValue) => {
+      if (
+        currentValue.parent_level_label === "Bloc" ||
+        currentValue.parent_level_label === "bloc"
+      ) {
+        return accumulator.add(currentValue.parent_unit_code);
+      } else return accumulator;
+    };
+    const blocs = Array.from(data.reduce(reducer1, new Set()));
+
+    // Récupération des parcelles
+    // Pour prendre en compte les sous-parcelles qui ont un bloc comme parent, il faut ajouter les sous-parcelles ici !
+    const reducer2 = (accumulator, currentValue) => {
+      if (
+        (currentValue.level_label === "parcelle" ||
+          currentValue.level_label === "plot") &&
+        (currentValue.parent_level_label === "Bloc" ||
+          currentValue.parent_level_label === "bloc")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const parcelles = groupBy(
+      Array.from(data.reduce(reducer2, [])),
+      "exp_unit_id"
+    );
+
+    // Récupération des sous_parcelles
+    const reducer3 = (accumulator, currentValue) => {
+      if (
+        currentValue.level_label === "sous_parcelle" &&
+        (currentValue.parent_level_label === "parcelle" ||
+          currentValue.parent_level_label === "plot")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const sous_parcelles = groupBy(
+      Array.from(data.reduce(reducer3, [])),
+      "exp_unit_id"
+    );
+
+    let sous_parcelles_grouped = []; // Va contenir les sous_parcelles
+    let parcelles_grouped = []; // Va contenir les parcelles
+
+    // Regroupement des sous_parcelles par factor et par factor_level
+    if (sous_parcelles.length !== 0) {
+      sous_parcelles_grouped = groupFactors(sous_parcelles);
+    }
+
+    // Regroupement des parcelles par factor et par factor_level
+    if (parcelles.length !== 0) {
+      parcelles_grouped = groupFactors(parcelles);
+    }
+
+    // A chaque parcelle on y ajoute ses sous-parcelles
+    const hierarchy_parcelles = parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: sous_parcelles_grouped.filter(
+          (d) => p.name.search(d.parent_unit_code) !== -1
+        ),
+      };
+    });
+
+    // A chaque bloc on y ajoute ses parcelles
+    const hierarchy = blocs.map((p) => {
+      return {
+        name: p,
+        children: hierarchy_parcelles.filter((d) => d.parent_unit_code === p),
+      };
+    });
+
+    // On ajoute l'essai en racine de la hiérarchie
+    data = {
+      name: trialCode,
+      children: hierarchy,
+    };
+
+    const root = d3.hierarchy(data);
+
+    console.log("root", root);
+
+    return root;
+  }
+
+  function groupFactors(tab) {
+    let result = [];
+    for (const exp_id in tab) {
+      const exp = tab[exp_id];
+
+      const res = exp.reduce((acc, curr) => {
+        const factor = curr.factor;
+        const factor_level = curr.factor_level;
+        const factor_desc = curr.factor_level_description;
+        const exp_unit_id = curr.exp_unit_id;
+        const level_label = curr.level_label;
+        const name = curr.name;
+        const parent_level_label = curr.parent_level_label;
+        const parent_unit_code = curr.parent_unit_code;
+
+        if (!acc.hasOwnProperty("exp_unit_id")) {
+          acc["exp_unit_id"] = exp_unit_id;
+          acc["level_label"] = level_label;
+          acc["name"] = name;
+          acc["parent_level_label"] = parent_level_label;
+          acc["parent_unit_code"] = parent_unit_code;
+          acc["factors"] = {};
+        }
+
+        if (acc.factors.hasOwnProperty(factor)) {
+          acc.factors[factor].level.push(factor_level);
+          acc.factors[factor].description.push(factor_desc);
+        } else {
+          acc.factors[factor] = {
+            level: [factor_level],
+            description: [factor_desc],
+          };
+        }
+
+        return acc;
+      }, {});
+
+      result.push(res);
+    }
+
+    return result;
   }
 
   function groupBy(array, property) {
@@ -474,6 +587,7 @@
    * @param {Array} elements
    */
   function filterElements(elements) {
+    console.log("elements", elements);
     // Filtrage des éléments qui ont des valeurs
     if (elements[0].data.hasOwnProperty("factors")) {
       const res = elements.filter((d) => factorFilter(d.data.factors));
@@ -482,8 +596,8 @@
       // Filtrage des éléments qui n'ont pas de valeur
       const res = elements.filter((d) => {
         let match = [];
-        d.children.forEach((child) => {
-          const factors = child.data.factors;
+        d.data.children.forEach((child) => {
+          const factors = child.factors;
           const matchChild = factorFilter(factors);
           match.push(matchChild);
         });
