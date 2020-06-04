@@ -154,8 +154,7 @@ class Trial_model extends MY_Model
       ->join("exp_unit e2", "e2.exp_unit_id = e.assigned_to")
       ->join("factor_level fl", "fl.factor_level_id = fu.factor_level_id")
       ->join("factor f", "f.factor_id = fl.factor_id")
-      //->where('e.trial_code', $trial_code)
-      ->where('e.trial_code', "Matrice_Andrano_0304")
+      ->where('e.trial_code', $trial_code)
       ->order_by('e.unit_code')
       ->get()
       ->result_array();
@@ -264,7 +263,8 @@ class Trial_model extends MY_Model
       ->join("factor_level fl", "fl.factor_level_id = fu.factor_level_id")
       ->join("factor f", "f.factor_id = fl.factor_id")
       ->where('e.trial_code', $trial_code)
-      ->where_in("f.factor", $factors)
+      // ->where_in("f.factor", $factors)
+      ->where_in("fl.factor_level", $factors)
       ->order_by('e.unit_code')
       ->get()
       ->result_array();
@@ -321,6 +321,25 @@ class Trial_model extends MY_Model
       ->where("ob.obs_variable", $obs_variable)
       ->order_by("exp_unit_id", "ASC")
       ->order_by("obs_date", "ASC")
+      ->get()
+      ->result_array();
+  }
+
+  function factors_lvl_list($trial_code)
+  {
+    $selectedFields = array(
+      "f.factor",
+      "fl.factor_level",
+    );
+
+    return $this->db->distinct()
+      ->select($selectedFields)
+      ->from("factor_unit fu")
+      ->join("exp_unit e", "e.exp_unit_id = fu.exp_unit_id")
+      ->join("factor_level fl", "fl.factor_level_id = fu.factor_level_id")
+      ->join("factor f", "f.factor_id = fl.factor_id")
+      ->where('e.trial_code', $trial_code)
+      ->order_by('f.factor, fl.factor_level')
       ->get()
       ->result_array();
   }

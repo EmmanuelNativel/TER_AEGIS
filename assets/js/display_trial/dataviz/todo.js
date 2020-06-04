@@ -65,5 +65,4 @@
 /**
  * TODO :
  * - Nettoyage des fonctions côté serveur !
- * - Regrouper par unité expérimentale !
  */
