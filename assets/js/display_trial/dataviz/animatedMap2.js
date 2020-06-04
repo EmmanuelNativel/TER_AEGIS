@@ -904,7 +904,7 @@
       .style("font-size", function (d) {
         return d.scale * 0.9 + "px";
       });
-    /*
+
     // AFFICHAGE DES DESCRIPTIONS
     labels
       .on("mouseover", (d, i) => {
@@ -919,10 +919,8 @@
             x +
             div_main.offsetLeft -
             Math.round(div.style("width").slice(0, -2)) / 2;
-          y =
-            y +
-            div_main.offsetTop -
-            Math.round(div.style("height").slice(0, -2)) / 2;
+          y = y + div_main.offsetTop + 5;
+          // Math.round(div.style("height").slice(0, -2)) / 2;
 
           div
             .transition()
@@ -932,10 +930,8 @@
               div
                 .html(() => {
                   return getDescriptionText(d);
-                  return (
-                    "Description : " + "<br/>" + d.data.factor_level_description
-                  );
                 })
+                .style("display", "block")
                 .style("left", x + "px")
                 .style("top", y + "px");
             });
@@ -943,13 +939,9 @@
       })
       .on("mouseout", (d, i) => {
         if (d.depth > 1) {
-          d3.selectAll(".tooltip")
-            .transition()
-            .duration(200)
-            .style("opacity", 0);
+          div.style("display", "none");
         }
       });
-      */
 
     if (animation) {
       svgAnimation.selectAll("text").each(function (d, i) {
