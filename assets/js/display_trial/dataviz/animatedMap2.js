@@ -134,12 +134,7 @@
     //Lors de la séléction/désélection d'une variable, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
     // onChange(/*() => drawSlider(dateMin, dateMax)*/);
-    /*
-    clearSlider();
-    // drawSVG();
-    
-    getPath(current_element);
-    */
+
     div.style("display", "none");
     loadValues(current_element.data.name, () => {
       updateValues(selected_date);
@@ -173,7 +168,12 @@
   }
 
   // On redessine la dataviz quand on redimensionne la fenêtre
-  // window.addEventListener("resize", drawChildren); //listener pour redessiner lors du resize
+  window.addEventListener("resize", () => {
+    WIDTH = document.getElementById(div_id).clientWidth / 1.5;
+    HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
+    drawSVG();
+    drawChildren(current_element.children);
+  }); //listener pour redessiner lors du resize
 
   function drawSVG() {
     var globalDivEl = document.getElementById("expUnitGraph");
@@ -553,12 +553,12 @@
       .html((d) => "<a  class='white-text'>" + d.data.name + "</a>")
       .on("click", (d) => {
         if (d === current_element) return;
+        div.style("display", "none");
         current_element = d;
         clearSlider();
         drawSlider(dateMin, dateMax);
         drawChildren(d.children, true);
         getPath(current_element);
-        div.style("display", "none");
       });
   }
 
@@ -1343,6 +1343,7 @@
 
   //animation zoom
   function AnimationZoom(id, data) {
+    svgAnimation.selectAll(".tspan").remove();
     var selectSqr = d3.select("#sqr_" + id);
     var selectLabel = d3.select("#label_" + id); // LABELS
     var selectTextZone = selectLabel.select(function () {
