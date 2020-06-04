@@ -173,7 +173,7 @@
     HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
     drawSVG();
     drawChildren(current_element.children);
-  }); //listener pour redessiner lors du resize
+  });
 
   function drawSVG() {
     var globalDivEl = document.getElementById("expUnitGraph");
@@ -1013,7 +1013,7 @@
       .text((d) => {
         if (d.depth > 1) {
           const exp = current_values[d.data.exp_unit_id];
-          const value = exp ? Number(exp.value).toFixed(2) : null;
+          const value = exp ? Number(exp.value).toFixed(3) : null;
           const unite = exp ? exp.unite : null;
           return value === null ? "Aucune valeur" : value + " " + unite;
         }
@@ -1322,21 +1322,9 @@
         const bestLowerDateValue = values
           .filter((v) => v.date < date)
           .slice(-1)[0];
-        const bestUpperDateValue = values.filter((v) => v.date > date)[0];
-        let bestValue;
-        if (bestUpperDateValue === undefined) bestValue = bestLowerDateValue;
-        else if (bestLowerDateValue === undefined)
-          bestValue = bestUpperDateValue;
-        else {
-          const lowerNumberOfDays = Math.abs(date - bestLowerDateValue.date);
-          const upperNumberOfDays = Math.abs(date - bestUpperDateValue.date);
-          bestValue =
-            Math.min(lowerNumberOfDays, upperNumberOfDays) === lowerNumberOfDays
-              ? bestLowerDateValue
-              : bestUpperDateValue;
-        }
 
-        current_values[exp_unit] = bestValue;
+        // current_values[exp_unit] = bestValue;
+        current_values[exp_unit] = bestLowerDateValue;
       }
     }
   }
