@@ -133,7 +133,20 @@
     selectedVariable = selectedValue;
     //Lors de la séléction/désélection d'une variable, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-    onChange(/*() => drawSlider(dateMin, dateMax)*/);
+    // onChange(/*() => drawSlider(dateMin, dateMax)*/);
+    /*
+    clearSlider();
+    // drawSVG();
+    
+    getPath(current_element);
+    */
+    loadValues(current_element.data.name, () => {
+      updateValues(selected_date);
+      getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
+      drawChildren(current_element.children);
+      drawSlider(dateMin, dateMax);
+      getPath(current_element);
+    });
   });
 
   function onChange(optionalCallback = () => {}) {
@@ -395,6 +408,14 @@
       parcelles_grouped = groupFactors(parcelles);
     }
 
+    // Traitement des sous_parcelles --> Si il y a des horizons à ajouter, il faut ajouter ici !
+    sous_parcelles_grouped = sous_parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: [],
+      };
+    });
+
     // A chaque parcelle on y ajoute ses sous-parcelles
     const hierarchy_parcelles = parcelles_grouped.map((p) => {
       return {
@@ -650,6 +671,7 @@
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
+      .attr("stroke", (d) => (d.data.children.length > 0 ? "white" : ""))
       .attr("rx", 15)
       .attr("ry", 15)
       .attr("id", (d, i) => "sqr_" + i)
@@ -1141,6 +1163,8 @@
     $("#slider").html("");
 
     var sliderButton = d3.select("#sliderButton");
+    sliderButton.select("i").attr("class", "fa fa-play");
+    if (timer) clearInterval(timer);
 
     if (
       !current_values.hasOwnProperty(
