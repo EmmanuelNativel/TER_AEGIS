@@ -283,6 +283,7 @@
     return root;
   }
 
+  // Sans les sous_parcelles
   function prepareHierarchy2(data) {
     // Récupération des premiers enfants (les blocs)
     const reducer = (accumulator, currentValue) =>
@@ -350,7 +351,8 @@
     return root;
   }
 
-  function prepareHierarchy(data) {
+  // Avec les sous_parcelles
+  function prepareHierarchy3(data) {
     // Récupération des premiers enfants (les blocs)
     const reducer1 = (accumulator, currentValue) => {
       if (
@@ -448,6 +450,178 @@
     return root;
   }
 
+  // Avec les sous_parcelles + correction de la BDD
+  function prepareHierarchy4(data) {
+    // Récupération des premiers enfants (les blocs)
+    const reducer1 = (accumulator, currentValue) => {
+      if (
+        currentValue.parent_level_label === "Bloc" ||
+        currentValue.parent_level_label === "bloc"
+      ) {
+        return accumulator.add(currentValue.parent_unit_code);
+      } else return accumulator;
+    };
+    const blocs = Array.from(data.reduce(reducer1, new Set()));
+
+    // Récupération des parcelles
+    // Pour prendre en compte les sous-parcelles qui ont un bloc comme parent, il faut ajouter les sous-parcelles ici !
+    const reducer2 = (accumulator, currentValue) => {
+      if (
+        (currentValue.level_label === "parcelle" ||
+          currentValue.level_label === "plot" ||
+          currentValue.level_label === "sous_parcelle") &&
+        (currentValue.parent_level_label === "Bloc" ||
+          currentValue.parent_level_label === "bloc")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const parcelles = groupBy(
+      Array.from(data.reduce(reducer2, [])),
+      "exp_unit_id"
+    );
+
+    // Récupération des sous_parcelles
+    const reducer3 = (accumulator, currentValue) => {
+      if (
+        currentValue.level_label === "sous_parcelle" &&
+        (currentValue.parent_level_label === "parcelle" ||
+          currentValue.parent_level_label === "plot")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const sous_parcelles = groupBy(
+      Array.from(data.reduce(reducer3, [])),
+      "exp_unit_id"
+    );
+
+    let sous_parcelles_grouped = []; // Va contenir les sous_parcelles
+    let parcelles_grouped = []; // Va contenir les parcelles
+
+    // Regroupement des sous_parcelles par factor et par factor_level
+    if (sous_parcelles.length !== 0) {
+      sous_parcelles_grouped = groupFactors(sous_parcelles);
+    }
+
+    // Regroupement des parcelles par factor et par factor_level
+    if (parcelles.length !== 0) {
+      parcelles_grouped = groupFactors(parcelles);
+    }
+
+    // Traitement des sous_parcelles --> Si il y a des horizons à ajouter, il faut ajouter ici !
+    sous_parcelles_grouped = sous_parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: [],
+      };
+    });
+
+    // A chaque parcelle on y ajoute ses sous-parcelles
+    const hierarchy_parcelles = parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: sous_parcelles_grouped.filter(
+          (d) => p.name.search(d.parent_unit_code) !== -1
+        ),
+      };
+    });
+
+    // A chaque bloc on y ajoute ses parcelles
+    const hierarchy = blocs.map((p) => {
+      return {
+        name: p,
+        children: hierarchy_parcelles.filter((d) => d.parent_unit_code === p),
+      };
+    });
+
+    // On ajoute l'essai en racine de la hiérarchie
+    data = {
+      name: trialCode,
+      children: hierarchy,
+    };
+
+    const root = d3.hierarchy(data);
+
+    console.log("root", root);
+
+    return root;
+  }
+
+  // Avec les num_level
+  function prepareHierarchy(data) {
+    let max_lvl = 1; //va contenir la profondeur max des données
+
+    // Récupération des premiers enfants (les blocs)
+    const reducer1 = (accumulator, currentValue) => {
+      // On en profite pr récupérer la profondeur max de l'essai
+      currentValue.num_level = Number(currentValue.num_level);
+      currentValue.parent_num_level = Number(currentValue.parent_num_level);
+      if (currentValue.num_level > max_lvl) max_lvl = currentValue.num_level;
+      if (currentValue.parent_num_level === 1) {
+        return accumulator.add(currentValue.parent_unit_code);
+      } else return accumulator;
+    };
+    const blocs = Array.from(data.reduce(reducer1, new Set()));
+
+    let sub_hierarchy = []; // va contenir la hiérarchie sans le premier niveau
+    // On parcours les différents niveaux des données en commançant par le plus profond jusqu'au niveau 2 (sans les blocs)
+    for (let profondeur = max_lvl; profondeur >= 2; profondeur--) {
+
+      const reducer = (accumulator, currentValue) => {
+        if (
+          currentValue.num_level === profondeur &&
+          currentValue.parent_num_level === profondeur - 1
+        ) {
+          accumulator.push(currentValue);
+        }
+        return accumulator;
+      };
+      //On récupère les éléments qui ont la profondeur courante
+      const elements = groupBy(
+        Array.from(data.reduce(reducer, [])),
+        "exp_unit_id"
+      );
+
+      // On les regroupes par facteurs
+      const grouped_elements = groupFactors(elements); 
+
+      // On leur ajoute leurs enfants (qui eux sont stockés dans sub_hierarchy)
+      sub_hierarchy = grouped_elements.map((p) => {
+        return {
+          ...p,
+          children: sub_hierarchy.filter(
+            (d) =>
+              p.name.search(d.parent_unit_code) !== -1 &&
+              d.parent_num_level === p.num_level
+          ),
+        };
+      });
+    }
+
+    // On ajoute les blocs
+    const hierarchy = blocs.map((p) => {
+      return {
+        name: p,
+        children: sub_hierarchy.filter((d) => d.parent_unit_code === p),
+      };
+    });
+
+    // On ajoute l'essai en racine de la hiérarchie
+    data = {
+      name: trialCode,
+      children: hierarchy,
+    };
+
+    const root = d3.hierarchy(data);
+
+    console.log("root", root);
+
+    return root;
+  }
+
   function groupFactors(tab) {
     let result = [];
     for (const exp_id in tab) {
@@ -459,16 +633,20 @@
         const factor_desc = curr.factor_level_description;
         const exp_unit_id = curr.exp_unit_id;
         const level_label = curr.level_label;
+        const num_level = curr.num_level;
         const name = curr.name;
         const parent_level_label = curr.parent_level_label;
         const parent_unit_code = curr.parent_unit_code;
+        const parent_num_level = curr.parent_num_level;
 
         if (!acc.hasOwnProperty("exp_unit_id")) {
           acc["exp_unit_id"] = exp_unit_id;
           acc["level_label"] = level_label;
+          acc["num_level"] = num_level;
           acc["name"] = name;
           acc["parent_level_label"] = parent_level_label;
           acc["parent_unit_code"] = parent_unit_code;
+          acc["parent_num_level"] = parent_num_level;
           acc["factors"] = {};
         }
 

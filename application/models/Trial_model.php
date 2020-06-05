@@ -248,8 +248,10 @@ class Trial_model extends MY_Model
         "e.exp_unit_id",
         "e.unit_code as name",
         "e.level_label",
+        "e.num_level",
         "e2.unit_code as parent_unit_code",
         "e2.level_label as parent_level_label",
+        "e2.num_level as parent_num_level",
         "f.factor",
         "fl.factor_level",
         "fl.factor_level_description"
