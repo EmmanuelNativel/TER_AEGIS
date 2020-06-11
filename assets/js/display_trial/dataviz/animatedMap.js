@@ -15,48 +15,107 @@
   let WIDTH = document.getElementById(div_id).clientWidth / 1.5;
   let HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
   let svgAnimation = null; // SVG contenant l'animation
-  const MIN_COLOR = "#7DCEA0";
-  const MAX_COLOR = "#196F3D";
+  let MIN_COLOR = "#7DCEA0";
+  let MAX_COLOR = "#196F3D";
   const DEFAULT_COLOR = "rgba(23,32,42,1)";
-  const BACKGROUND_COLOR = "#784212";
+  let BACKGROUND_COLOR = "#784212";
   const LABEL_COLOR = "white";
   const NULL_COLOR = "#ACBD32"; // yellow
+  let R = 255,
+    G = 0,
+    B = 0;
   let path = [];
-
-  // On redessine la dataviz quand on redimensionne la fenêtre
-  // window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
+  const FACTORS_NAME = [
+    "management",
+    "fertilization",
+    "variety",
+    "system",
+    "crop",
+  ];
+  let selectedManagement = [];
+  let selectedFertilization = [];
+  let selectedVariety = [];
+  let selectedSystem = [];
+  let selectedCrop = [];
+  let timer = null;
 
   var div = d3
     .select("body")
     .append("div")
     .attr("class", "tooltip")
     .style("width", "200px")
-    .style("opacity", 0)
     .style("position", "absolute")
     .style("text-align", "center")
     .style("padding", "10px")
     .style("border", "2px solid black")
     .style("border-radius", "5px")
-    .style("background", "white");
+    .style("background", "white")
+    .style("display", "none");
 
-  /**
-   * Sélection des facteurs :
-   * Handler pour la selection des facteurs
-   */
-  $("#factor_selectPicker").on("changed.bs.select", function (
-    e,
-    clickedIndex,
-    isSelected,
-    previousValue
-  ) {
-    var selected = $(this).find("option").eq(clickedIndex);
-    //var selectedFactorId = selected.val();
-    var selecFactor = selected.text();
-    utils.arrayToggleValue(selectedFactors, selecFactor);
+  FACTORS_NAME.forEach((fName) => {
+    const select_id = `#${fName}_selectPicker`;
 
-    //Lors de la séléction/désélection d'un facteur, on (re)charge les données d'observations
-    // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-    onChange();
+    $(select_id).on("changed.bs.select", function (
+      e,
+      clickedIndex,
+      isSelected,
+      previousValue
+    ) {
+      var selected = $(this).find("option").eq(clickedIndex);
+
+      // Sélection d'un unique élément
+      if (selected.length > 0) {
+        var selecText = $(this).find("option").eq(clickedIndex).text();
+
+        switch (fName) {
+          case "management":
+            utils.arrayToggleValue(selectedManagement, selecText);
+            break;
+          case "fertilization":
+            utils.arrayToggleValue(selectedFertilization, selecText);
+            break;
+          case "variety":
+            utils.arrayToggleValue(selectedVariety, selecText);
+            break;
+          case "system":
+            utils.arrayToggleValue(selectedSystem, selecText);
+            break;
+          case "crop":
+            utils.arrayToggleValue(selectedCrop, selecText);
+            break;
+
+          default:
+            break;
+        }
+      }
+      // Sélection de tous les éléments grâce au bouton dédié
+      else {
+        const val = $(select_id).val() || [];
+
+        switch (fName) {
+          case "management":
+            selectedManagement = val;
+            break;
+          case "fertilization":
+            selectedFertilization = val;
+            break;
+          case "variety":
+            selectedVariety = val;
+            break;
+          case "system":
+            selectedSystem = val;
+            break;
+          case "crop":
+            selectedCrop = val;
+            break;
+
+          default:
+            break;
+        }
+      }
+
+      onChange();
+    });
   });
 
   /**
@@ -73,15 +132,32 @@
     selectedVariable = selectedValue;
     //Lors de la séléction/désélection d'une variable, on (re)charge les données d'observations
     // liée à cette unité, puis on refresh le graphique D3.js avec les nouvelles données.
-    onChange(/*() => drawSlider(dateMin, dateMax)*/);
+    // onChange(/*() => drawSlider(dateMin, dateMax)*/);
+
+    div.style("display", "none");
+    loadValues(current_element.data.name, () => {
+      updateValues(selected_date);
+      getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
+      drawChildren(current_element.children);
+      drawSlider(dateMin, dateMax);
+      getPath(current_element);
+      createColorSelect();
+    });
   });
 
   function onChange(optionalCallback = () => {}) {
-    if (selectedFactors.length === 0) {
+    if (
+      selectedManagement.length === 0 &&
+      selectedFertilization.length === 0 &&
+      selectedVariety.length === 0 &&
+      selectedSystem.length === 0 &&
+      selectedCrop.length === 0
+    ) {
       $("#expUnitGraph").html(
         "<br><p> Veuillez sélectionner au moins un facteur... </p>"
       );
     } else {
+      clearSlider();
       drawSVG();
       loadHierarchy(() => {
         drawChildren(current_element.children, true);
@@ -92,7 +168,12 @@
   }
 
   // On redessine la dataviz quand on redimensionne la fenêtre
-  // window.addEventListener("resize", drawChildren); //listener pour redessiner lors du resize
+  window.addEventListener("resize", () => {
+    WIDTH = document.getElementById(div_id).clientWidth / 1.5;
+    HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
+    drawSVG();
+    drawChildren(current_element.children);
+  });
 
   function drawSVG() {
     var globalDivEl = document.getElementById("expUnitGraph");
@@ -111,27 +192,48 @@
       // .attr("width", globalDiv.style("width"))
       // .attr("height", globalDiv.style("width"))
       .style("background-color", BACKGROUND_COLOR);
-    // .style("border", "1px solid red")
-    // .append("g")
     // .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    svgAnimation.on("mouseout", () => div.style("display", "none"));
   }
 
   function loadHierarchy(onSuccessCallback) {
+    const all_factors_level_selected = selectedManagement
+      .concat(selectedFertilization)
+      .concat(selectedVariety)
+      .concat(selectedSystem)
+      .concat(selectedCrop);
+
     $.ajax({
       url: SiteURL + "/Trials/ajaxLoadDataForAnimatedMap/",
       data: {
         trialCode: JSON.stringify(trialCode),
-        factors: JSON.stringify(selectedFactors),
+        factors: JSON.stringify(all_factors_level_selected),
         obs_value: JSON.stringify(selectedVariable),
       },
       type: "POST",
       dataType: "json",
       success: function (response) {
-        const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
+        // const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
+        // current_element = root; // On indique l'élément courant
+        // onSuccessCallback(); // On va afficher les enfants de l'élément courant
+        loadParents(response.expData, onSuccessCallback);
+      },
+    });
+  }
+
+  function loadParents(data, onSuccessCallback) {
+    $.ajax({
+      url: SiteURL + "/Trials/ajaxLoadParents/",
+      data: {
+        trialCode: JSON.stringify(trialCode),
+      },
+      type: "POST",
+      dataType: "json",
+      success: function (response) {
+        // const all_data = data.concat(response.parents);
+        const root = prepareHierarchy(data, response.parents); // Préparation de la hiérarchie
         current_element = root; // On indique l'élément courant
-        // VALUES = response.expValues;
-        // obs_values = prepareValues(response.expValues); // Préparation des valeurs
-        // current_values = JSON.parse(JSON.stringify(obs_values));
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -156,32 +258,59 @@
     });
   }
 
-  function prepareData(dataH, dataV) {
-    // Récupération des premiers enfants (les blocs)
-    const reducer = (accumulator, currentValue) =>
-      accumulator.add(currentValue.parent_unit_code);
-    const parents = Array.from(dataH.reduce(reducer, new Set()));
+  // Préparation de la hiérarchie de données
+  function prepareHierarchy(data, parents) {
+    let max_lvl = 1; //va contenir la profondeur max des données
 
-    var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
-
-    // Insertion des valeurs et de leurs dates dans chaque parcelle
-    const dataWithValues = dataH.map((d) => {
-      const valuesChildren = dataV.filter(
-        (child) => child.exp_unit_id === d.exp_unit_id
-      );
-      const valuesNeeded = valuesChildren.map((v) => ({
-        date: parseDate(v.date),
-        value: v.value,
-      }));
-
-      return { ...d, values: valuesNeeded };
+    // Transformation des num_level en Number
+    data.map((e) => {
+      e.num_level = Number(e.num_level);
+      e.parent_num_level = Number(e.parent_num_level);
+      if (e.num_level > max_lvl) max_lvl = e.num_level;
+    });
+    parents.map((e) => {
+      e.num_level = Number(e.num_level);
     });
 
-    // A chaque bloc on y ajoute ses parcelles
+    let sub_hierarchy = []; // va contenir la hiérarchie sans le premier niveau
+
+    // On parcours les différents niveaux des données en commançant par le plus profond jusqu'au niveau 2 (sans les blocs)
+    for (let profondeur = max_lvl; profondeur >= 2; profondeur--) {
+      //On récupère les éléments qui ont la profondeur courante
+      const reducer = (accumulator, currentValue) => {
+        if (currentValue.num_level === profondeur) {
+          accumulator.push(currentValue);
+        }
+        return accumulator;
+      };
+
+      // On les regroupe par exp_unit_id
+      const elements = groupBy(
+        Array.from(data.reduce(reducer, [])),
+        "exp_unit_id"
+      );
+
+      // On les regroupe par facteurs
+      const grouped_elements = groupFactors(elements);
+
+      sub_hierarchy = grouped_elements.map((p) => {
+        return {
+          ...p,
+          children: sub_hierarchy.filter((e) => {
+            return p.exp_unit_id === e.parent_unit_id;
+            //return p.name.search(e.parent_unit_code) !== -1 && e.parent_num_level === p.num_level;
+          }),
+        };
+      });
+    }
+
+    // On ajoute les blocs
     const hierarchy = parents.map((p) => {
       return {
-        name: p,
-        children: dataWithValues.filter((d) => d.parent_unit_code === p),
+        ...p,
+        children: sub_hierarchy.filter(
+          (e) => e.parent_unit_id === p.exp_unit_id
+        ),
       };
     });
 
@@ -196,30 +325,53 @@
     return root;
   }
 
-  function prepareHierarchy(data) {
-    console.log("data", data);
-    // Récupération des premiers enfants (les blocs)
-    const reducer = (accumulator, currentValue) =>
-      accumulator.add(currentValue.parent_unit_code);
-    const parents = Array.from(data.reduce(reducer, new Set()));
+  function groupFactors(tab) {
+    let result = [];
+    for (const exp_id in tab) {
+      const exp = tab[exp_id];
 
-    // A chaque bloc on y ajoute ses parcelles
-    const hierarchy = parents.map((p) => {
-      return {
-        name: p,
-        children: data.filter((d) => d.parent_unit_code === p),
-      };
-    });
+      const res = exp.reduce((acc, curr) => {
+        const factor = curr.factor;
+        const factor_level = curr.factor_level;
+        const factor_desc = curr.factor_level_description;
+        const exp_unit_id = curr.exp_unit_id;
+        const level_label = curr.level_label;
+        const num_level = curr.num_level;
+        const name = curr.name;
+        const parent_level_label = curr.parent_level_label;
+        const parent_unit_code = curr.parent_unit_code;
+        const parent_num_level = curr.parent_num_level;
+        const parent_unit_id = curr.parent_unit_id;
 
-    // On ajoute l'essai en racine de la hiérarchie
-    data = {
-      name: trialCode,
-      children: hierarchy,
-    };
+        if (!acc.hasOwnProperty("exp_unit_id")) {
+          acc["exp_unit_id"] = exp_unit_id;
+          acc["level_label"] = level_label;
+          acc["num_level"] = num_level;
+          acc["name"] = name;
+          acc["parent_level_label"] = parent_level_label;
+          acc["parent_unit_code"] = parent_unit_code;
+          acc["parent_num_level"] = parent_num_level;
+          acc["parent_unit_id"] = parent_unit_id;
+          acc["factors"] = {};
+        }
 
-    const root = d3.hierarchy(data);
+        if (acc.factors.hasOwnProperty(factor)) {
+          acc.factors[factor].level.push(factor_level);
+          acc.factors[factor].description.push(factor_desc);
+        } else {
+          acc.factors[factor] = {
+            level: [factor_level],
+            description: [factor_desc],
+          };
+        }
 
-    return root;
+        return acc;
+      }, {});
+
+      result.push(res);
+    }
+
+    return result;
   }
 
   function groupBy(array, property) {
@@ -284,17 +436,98 @@
       .html((d) => "<a  class='white-text'>" + d.data.name + "</a>")
       .on("click", (d) => {
         if (d === current_element) return;
+        div.style("display", "none");
         current_element = d;
+        clearSlider();
         drawSlider(dateMin, dateMax);
         drawChildren(d.children, true);
         getPath(current_element);
       });
   }
 
-  function drawChildren(elements, animation = false) {
+  /**
+   * Retourne true si un élément match avec les facteurs sélectionnés.
+   * Prend l'objet factors de l'élément à tester en paramètre
+   * @param {Objet} factors
+   */
+  function factorFilter(factors) {
+    let match = true;
+
+    if (selectedManagement.length !== 0) {
+      if (
+        !factors.management ||
+        !contains(selectedManagement, factors.management.level)
+      )
+        match = false;
+    }
+
+    if (selectedFertilization.length !== 0) {
+      if (
+        !factors.fertilization ||
+        !contains(selectedFertilization, factors.fertilization.level)
+      )
+        match = false;
+    }
+
+    if (selectedVariety.length !== 0) {
+      if (!factors.variety || !contains(selectedVariety, factors.variety.level))
+        match = false;
+    }
+
+    if (selectedSystem.length !== 0) {
+      if (!factors.system || !contains(selectedSystem, factors.system.level))
+        match = false;
+    }
+
+    if (selectedCrop.length !== 0) {
+      if (!factors.crop || !contains(selectedCrop, factors.crop.level))
+        match = false;
+    }
+
+    return match;
+  }
+
+  /**
+   * Filtre les éléments en fonction des facteurs sélectionnées (croisement des facteurs)
+   * Retourne uniquement les éléments qui match avec les facteurs sélectionnés
+   * @param {Array} elements
+   */
+  function filterElements(elements) {
+    // Filtrage des éléments qui ont des valeurs
+    if (elements[0].data.hasOwnProperty("factors")) {
+      const res = elements.filter((d) => factorFilter(d.data.factors));
+      return res;
+    } else {
+      // Filtrage des éléments qui n'ont pas de valeur
+      const res = elements.filter((d) => {
+        let match = [];
+        d.data.children.forEach((child) => {
+          const factors = child.factors;
+          const matchChild = factorFilter(factors);
+          match.push(matchChild);
+        });
+        return match.includes(true);
+      });
+      return res;
+    }
+  }
+
+  /**
+   * Retourne Vrai si tab2 contient au moins un élément de tab1
+   * @param {Array} tab1
+   * @param {Array} tab2
+   */
+  function contains(tab1, tab2) {
+    // savoir si tab2 contient au moins un élément de tab1
+    return tab2.some((e) => tab1.includes(e));
+  }
+
+  function drawChildren(objets, animation = false) {
     svgAnimation.selectAll("rect").remove(); // On efface les anciens éléments
     svgAnimation.selectAll("text").remove(); // On efface les anciens labels
     svgAnimation.selectAll(".tspan").remove();
+
+    const elements = filterElements(objets); // On sélectionne uniquement les éléments qui correspondent aux factor_lvl sélectionnés
 
     const nb = elements.length; // Le nombre d'éléments à insérer
     const maxRectInLine = Math.ceil(Math.sqrt(nb)); // Le nombre maximum d'éléments par ligne
@@ -322,6 +555,7 @@
       })
       .attr("width", rectWidth - rectPadding)
       .attr("height", rectHeight - rectPadding)
+      .attr("stroke", (d) => (d.data.children.length > 0 ? "white" : ""))
       .attr("rx", 15)
       .attr("ry", 15)
       .attr("id", (d, i) => "sqr_" + i)
@@ -356,10 +590,8 @@
             x +
             div_main.offsetLeft -
             Math.round(div.style("width").slice(0, -2)) / 2;
-          y =
-            y +
-            div_main.offsetTop -
-            Math.round(div.style("height").slice(0, -2)) / 2;
+          y = y + div_main.offsetTop + 5;
+          // Math.round(div.style("height").slice(0, -2)) / 2;
 
           div
             .transition()
@@ -367,9 +599,10 @@
             .style("opacity", 0.9)
             .on("start", () => {
               div
-                .html(
-                  "Description : " + "<br/>" + d.data.factor_level_description
-                )
+                .html(() => {
+                  return getDescriptionText(d);
+                })
+                .style("display", "block")
                 .style("left", x + "px")
                 .style("top", y + "px");
             });
@@ -377,7 +610,7 @@
       })
       .on("mouseout", (d, i) => {
         if (d.depth > 1) {
-          div.transition().duration(300).style("opacity", 0);
+          div.style("display", "none");
         }
       });
 
@@ -410,9 +643,11 @@
     square
   ) {
     const rectPadding = 2;
-    const maxNumberOfTspan = 3;
-    const maxTspanSize = (rectHeight / maxNumberOfTspan) * 0.8;
-    const minTspanSize = 7;
+    const maxNumberOfTspan = 6;
+    const maxTspanSize = (rectHeight / maxNumberOfTspan) * 0.7;
+    const minTspanSize = 8;
+    let fontsizes = [];
+    let numberOfTspanFactor = 0;
 
     var labels = svgAnimation
       .selectAll("text")
@@ -420,21 +655,39 @@
       .enter()
       .append("text");
 
-    function getSize(d) {
+    function getSize(d, i) {
       const maxSize = 20;
+      let scale = 0;
       if (d.depth > 1) {
         // var bbox = this.getBBox(),
         // cbbox = this.parentNode.getBBox(),
-        var textLength = d3.select(this).text().length,
-          scale = ((rectWidth - 4) / textLength) * 1.1;
+        let textLength = d3.select(this).text().length;
+        scale = ((rectWidth - 4) / textLength) * 1.1;
 
         if (scale < minTspanSize) scale = minTspanSize;
         if (scale > maxTspanSize)
           scale = maxTspanSize > maxSize ? maxSize : maxTspanSize;
       } else {
-        var scale = maxSize;
+        scale = maxSize;
       }
+      if (!fontsizes.includes(scale)) fontsizes.push(scale);
+    }
 
+    function getNameSize(d, i) {
+      const maxSize = 20;
+      let scale = 0;
+      if (d.depth > 1) {
+        // var bbox = this.getBBox(),
+        // cbbox = this.parentNode.getBBox(),
+        let textLength = d3.select(this).text().length;
+        scale = ((rectWidth - 4) / textLength) * 1.1;
+
+        if (scale < minTspanSize) scale = minTspanSize;
+        if (scale >= maxTspanSize)
+          scale = maxTspanSize > maxSize ? maxSize : maxTspanSize;
+      } else {
+        scale = maxSize;
+      }
       d.scale = scale;
     }
 
@@ -445,49 +698,197 @@
       .attr("x", (d, i) =>
         animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
       )
-      .attr(
-        "y",
-        (d, i) =>
-          Math.trunc(i / maxRectInLine) * rectHeight +
-          rectHeight / (d.depth === 1 ? 2 : 4)
-      )
+      .attr("y", (d, i) => {
+        if (d.depth === 1)
+          return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
+        else
+          return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight * 0.1;
+        // return (
+        //   Math.trunc(i / maxRectInLine) * rectHeight +
+        //   rectHeight / (d.depth === 1 ? 2 : 7)
+        // );
+      })
       .attr("id", (d, i) => "label_" + i)
       .attr("width", rectWidth)
-      .attr("font-size", "1rem")
+      // .attr("font-size", "1rem")
       .attr("fill", LABEL_COLOR)
       .attr("text-anchor", "middle")
       .style("font-weight", "bold")
-      .each(getSize)
+      .each(getNameSize)
       .style("font-size", function (d) {
         return d.scale + "px";
       });
 
-    // FACTOR LEVEL
-    labels
-      .append("tspan")
-      .text((d) => {
-        if (d.depth > 1) {
-          return d.data.factor + " : " + d.data.factor_level;
-        }
-      })
-      .attr("x", (d, i) =>
-        animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
-      )
-      .attr(
-        "y",
-        (d, i) =>
-          Math.trunc(i / maxRectInLine) * rectHeight +
-          rectHeight / 4 +
-          maxTspanSize
-      )
-      .attr("width", rectWidth)
-      .attr("fill", LABEL_COLOR)
-      .attr("text-anchor", "middle")
-      .attr("class", "tspan")
-      .each(getSize)
-      .style("font-size", function (d) {
-        return d.scale + "px";
-      });
+    // Fertilization
+    if (selectedFertilization.length > 0) numberOfTspanFactor++;
+    for (let j = 0; j < selectedFertilization.length; j++) {
+      labels
+        .append("tspan")
+        .attr("font-family", "FontAwesome")
+        .text((d) => {
+          if (d.depth > 1) {
+            return "\uf067 : " + d.data.factors.fertilization.level;
+          }
+        })
+        .attr("x", (d, i) =>
+          animation ? 0 : (i % maxRectInLine) * rectWidth + 5
+        )
+        .attr("y", (d, i) => {
+          // numberOfTspanFactor++;
+          return (
+            Math.trunc(i / maxRectInLine) * rectHeight +
+            rectHeight / 6 +
+            maxTspanSize * numberOfTspanFactor
+          );
+        })
+        .attr("fill", LABEL_COLOR)
+        .attr("text-anchor", "start")
+        .attr("class", "tspan factor")
+        .style("font-weight", "normal")
+        .each(getSize)
+        .style("font-size", function (d) {
+          return d.scale + "px";
+          // return "10px";
+        });
+    }
+
+    // management
+    if (selectedManagement.length > 0) numberOfTspanFactor++;
+    for (let j = 0; j < selectedManagement.length; j++) {
+      labels
+        .append("tspan")
+        .attr("font-family", "FontAwesome")
+        .text((d) => {
+          if (d.depth > 1) {
+            return "\uf01c : " + d.data.factors.management.level;
+          }
+        })
+        .attr("x", (d, i) =>
+          animation ? 0 : (i % maxRectInLine) * rectWidth + 5
+        )
+        .attr("y", (d, i) => {
+          // numberOfTspanFactor++;
+          return (
+            Math.trunc(i / maxRectInLine) * rectHeight +
+            rectHeight / 6 +
+            maxTspanSize * numberOfTspanFactor
+          );
+        })
+        // .attr("width", rectWidth)
+        .attr("fill", LABEL_COLOR)
+        .attr("text-anchor", "start")
+        .attr("class", "tspan factor")
+        .style("font-weight", "normal")
+        .each(getSize)
+        .style("font-size", function (d) {
+          return d.scale + "px";
+          // return "10px";
+        });
+    }
+
+    // System
+    if (selectedSystem.length > 0) numberOfTspanFactor++;
+    for (let j = 0; j < selectedSystem.length; j++) {
+      labels
+        .append("tspan")
+        .attr("font-family", "FontAwesome")
+        .text((d) => {
+          if (d.depth > 1) {
+            return "\uf021 : " + d.data.factors.system.level;
+          }
+        })
+        .attr("x", (d, i) =>
+          animation ? 0 : (i % maxRectInLine) * rectWidth + 5
+        )
+        .attr("y", (d, i) => {
+          // numberOfTspanFactor++;
+          return (
+            Math.trunc(i / maxRectInLine) * rectHeight +
+            rectHeight / 6 +
+            maxTspanSize * numberOfTspanFactor
+          );
+        })
+        .attr("fill", LABEL_COLOR)
+        .attr("text-anchor", "start")
+        .attr("class", "tspan factor")
+        .style("font-weight", "normal")
+        .each(getSize)
+        .style("font-size", function (d) {
+          return d.scale + "px";
+          // return "10px";
+        });
+    }
+
+    // Variety
+    if (selectedVariety.length > 0) numberOfTspanFactor++;
+    for (let j = 0; j < selectedVariety.length; j++) {
+      labels
+        .append("tspan")
+        .attr("font-family", "FontAwesome")
+        .text((d) => {
+          if (d.depth > 1) {
+            return "\uf06c : " + d.data.factors.variety.level;
+          }
+        })
+        .attr("x", (d, i) =>
+          animation ? 0 : (i % maxRectInLine) * rectWidth + 5
+        )
+        .attr("y", (d, i) => {
+          // numberOfTspanFactor++;
+          return (
+            Math.trunc(i / maxRectInLine) * rectHeight +
+            rectHeight / 6 +
+            maxTspanSize * numberOfTspanFactor
+          );
+        })
+        .attr("fill", LABEL_COLOR)
+        .attr("text-anchor", "start")
+        .attr("class", "tspan factor")
+        .style("font-weight", "normal")
+        .each(getSize)
+        .style("font-size", function (d) {
+          return d.scale + "px";
+          // return "10px";
+        });
+    }
+
+    // Crop
+    if (selectedCrop.length > 0) numberOfTspanFactor++;
+    for (let j = 0; j < selectedCrop.length; j++) {
+      labels
+        .append("tspan")
+        .attr("font-family", "FontAwesome")
+        .text((d) => {
+          if (d.depth > 1) {
+            return "\uf0c4 : " + d.data.factors.crop.level;
+          }
+        })
+        .attr("x", (d, i) =>
+          animation ? 0 : (i % maxRectInLine) * rectWidth + 5
+        )
+        .attr("y", (d, i) => {
+          // numberOfTspanFactor++;
+          return (
+            Math.trunc(i / maxRectInLine) * rectHeight +
+            rectHeight / 6 +
+            maxTspanSize * numberOfTspanFactor
+          );
+        })
+        .attr("fill", LABEL_COLOR)
+        .attr("text-anchor", "start")
+        .attr("class", "tspan factor")
+        .style("font-weight", "normal")
+        .each(getSize)
+        .style("font-size", function (d) {
+          return d.scale + "px";
+          // return "10px";
+        });
+    }
+
+    // Mise à jour de la taille de la police
+    labels.selectAll(".factor").style("font-size", function (d) {
+      return d3.min(fontsizes);
+    });
 
     // VALUES
     labels
@@ -495,7 +896,7 @@
       .text((d) => {
         if (d.depth > 1) {
           const exp = current_values[d.data.exp_unit_id];
-          const value = exp ? Number(exp.value).toFixed(2) : null;
+          const value = exp ? Number(exp.value).toFixed(3) : null;
           const unite = exp ? exp.unite : null;
           return value === null ? "Aucune valeur" : value + " " + unite;
         }
@@ -507,19 +908,21 @@
         "y",
         (d, i) =>
           Math.trunc(i / maxRectInLine) * rectHeight +
-          rectHeight / 4 +
-          maxTspanSize * 2
+          // rectHeight / 4 +
+          // maxTspanSize * 2
+          rectHeight -
+          rectHeight * 0.1
       )
       .attr("font-size", "1rem")
       .attr("fill", (d) =>
         current_values[d.data.exp_unit_id] ? LABEL_COLOR : "red"
       )
-      .attr("width", rectWidth)
+      // .attr("width", rectWidth)
       .attr("text-anchor", "middle")
       .attr("class", "tspan")
-      .each(getSize)
+      .each(getNameSize)
       .style("font-size", function (d) {
-        return d.scale + "px";
+        return d.scale * 0.9 + "px";
       });
 
     // AFFICHAGE DES DESCRIPTIONS
@@ -536,10 +939,8 @@
             x +
             div_main.offsetLeft -
             Math.round(div.style("width").slice(0, -2)) / 2;
-          y =
-            y +
-            div_main.offsetTop -
-            Math.round(div.style("height").slice(0, -2)) / 2;
+          y = y + div_main.offsetTop + 5;
+          // Math.round(div.style("height").slice(0, -2)) / 2;
 
           div
             .transition()
@@ -547,9 +948,10 @@
             .style("opacity", 0.9)
             .on("start", () => {
               div
-                .html(
-                  "Description : " + "<br/>" + d.data.factor_level_description
-                )
+                .html(() => {
+                  return getDescriptionText(d);
+                })
+                .style("display", "block")
                 .style("left", x + "px")
                 .style("top", y + "px");
             });
@@ -557,10 +959,7 @@
       })
       .on("mouseout", (d, i) => {
         if (d.depth > 1) {
-          d3.selectAll(".tooltip")
-            .transition()
-            .duration(200)
-            .style("opacity", 0);
+          div.style("display", "none");
         }
       });
 
@@ -570,11 +969,59 @@
           .selectAll("tspan")
           .transition()
           .duration(500)
-          .attr("x", (d, j) => {
-            return (i % maxRectInLine) * rectWidth + rectWidth / 2;
-          });
+          .attr("x", (d, j) => (i % maxRectInLine) * rectWidth + rectWidth / 2);
+
+        d3.select(this)
+          .selectAll(".factor")
+          .transition()
+          .duration(500)
+          .attr("x", (d, j) => (i % maxRectInLine) * rectWidth + 5);
       });
     }
+  }
+
+  function getDescriptionText(d) {
+    let text = "<h3>Description</h3>";
+    text += "<p><b>Name : </b>" + d.data.name + "<br/></p>";
+    text += "<p><b>Type : </b>" + d.data.level_label + "</p>";
+    const factors = d.data.factors;
+    if (selectedManagement.length > 0) {
+      text += "<b>Management :</b><br/>";
+      factors["management"].description.forEach((e) => (text += `- ${e}<br/>`));
+      text += "<br/>";
+    }
+    if (selectedFertilization.length > 0) {
+      text += "<b>Fertilization :</b><br/>";
+      factors["fertilization"].description.forEach(
+        (e) => (text += `- ${e}<br/>`)
+      );
+      text += "<br/>";
+    }
+    if (selectedVariety.length > 0) {
+      const titre = "<b>Variety :</b><br/>";
+      let list = "";
+      factors["variety"].description.forEach(
+        (e) => e && (list += `- ${e}<br/>`)
+      );
+      if (list !== "") {
+        text += `${titre}${list}<br/>`;
+      } else {
+        factors["variety"].level.forEach((e) => (list += `- ${e}<br/>`));
+        text += `${titre}${list}<br/>`;
+      }
+    }
+    if (selectedSystem.length > 0) {
+      text += "<b>System :</b><br/>";
+      factors["system"].description.forEach((e) => (text += `- ${e}<br/>`));
+      text += "<br/>";
+    }
+    if (selectedCrop.length > 0) {
+      text += "<b>Crop :</b><br/>";
+      factors["crop"].description.forEach((e) => (text += `- ${e}<br/>`));
+      text += "<br/>";
+    }
+
+    return text;
   }
 
   /**
@@ -588,12 +1035,22 @@
     valueMax = Math.ceil(d3.max(valuesOfCurrentElements));
   }
 
+  function clearSlider() {
+    $("#slider").html("");
+    d3.select("#sliderButton")
+      .style("display", "none")
+      .select("i")
+      .attr("class", "fa fa-play");
+    clearInterval(timer);
+  }
+
   function drawSlider(dMin, dMax) {
     // On efface le slider
     $("#slider").html("");
 
     var sliderButton = d3.select("#sliderButton");
-    var timer = null;
+    sliderButton.select("i").attr("class", "fa fa-play");
+    if (timer) clearInterval(timer);
 
     if (
       !current_values.hasOwnProperty(
@@ -602,15 +1059,16 @@
     ) {
       clearInterval(timer);
       sliderButton.select("i").attr("class", "fa fa-play");
+      sliderButton.style("display", "none");
       return;
-    }
+    } else sliderButton.style("display", "block");
 
     var margin = { top: 0, right: 50, bottom: 0, left: 50 };
     var width = 500;
     var height = 100;
 
     var formatDateIntoMY = d3.timeFormat("%m/%Y");
-    var formatDate = d3.timeFormat("%b %Y");
+    var formatDate = d3.timeFormat("%d %b %Y");
     var formatDateComplet = d3.timeFormat("%d-%m-%Y");
 
     var moving = false;
@@ -636,7 +1094,13 @@
         .attr("x", 70)
         .attr("y", height / 2);
     } else {
-      var x = d3.scaleTime().domain([dMin, dMax]).range([0, width]).clamp(true);
+      let newdMax = new Date(dMax.getFullYear(),dMax.getMonth(),dMax.getDate()+1);
+      var x = d3
+        .scaleTime()
+        .domain([dMin, newdMax])
+        .nice()
+        .range([0, width])
+        .clamp(true);
 
       var slider = svgSlider
         .append("g")
@@ -747,29 +1211,18 @@
       if (exactDates.length > 0) current_values[exp_unit] = exactDates[0];
       else {
         const bestLowerDateValue = values
-          .filter((v) => v.date < date)
+          .filter((v) => v.date <= date)
           .slice(-1)[0];
-        const bestUpperDateValue = values.filter((v) => v.date > date)[0];
-        let bestValue;
-        if (bestUpperDateValue === undefined) bestValue = bestLowerDateValue;
-        else if (bestLowerDateValue === undefined)
-          bestValue = bestUpperDateValue;
-        else {
-          const lowerNumberOfDays = Math.abs(date - bestLowerDateValue.date);
-          const upperNumberOfDays = Math.abs(date - bestUpperDateValue.date);
-          bestValue =
-            Math.min(lowerNumberOfDays, upperNumberOfDays) === lowerNumberOfDays
-              ? bestLowerDateValue
-              : bestUpperDateValue;
-        }
 
-        current_values[exp_unit] = bestValue;
+        // current_values[exp_unit] = bestValue;
+        current_values[exp_unit] = bestLowerDateValue;
       }
     }
   }
 
   //animation zoom
   function AnimationZoom(id, data) {
+    svgAnimation.selectAll(".tspan").remove();
     var selectSqr = d3.select("#sqr_" + id);
     var selectLabel = d3.select("#label_" + id); // LABELS
     var selectTextZone = selectLabel.select(function () {
@@ -815,5 +1268,197 @@
       .on("end", (d) => {
         selectLabel.remove();
       });
+  }
+
+  //Séléction couleurs
+  function createColorSelect() {
+    d3.select("#sliderColor").remove();
+
+    var margin = { top: 0, right: 50, bottom: 0, left: 50 };
+    var width = 200;
+    var height = 100;
+
+    var svgSlider = d3
+      .select("#menuSetting")
+      .append("svg")
+      .attr("id", "sliderColor")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height);
+
+    svgSlider
+      .append("rect")
+      .attr("id", "colorIndicator")
+      .attr("x", 40)
+      .attr("y", 20)
+      .attr("width", 20)
+      .attr("height", 20)
+      .style("opacity", 0)
+      .attr("rx", 15)
+      .attr("ry", 15);
+
+    svgSlider.append("text").text("Couleurs").attr("x", 25).attr("y", 20).style("font-weight", 'bold').style("fill", "grey")
+
+    var x = d3.scaleTime().domain([0, 1275]).range([0, width]).clamp(true);
+
+    var slider = svgSlider
+      .append("g")
+      .attr("class", "slider")
+      .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
+
+    slider
+      .append("line")
+      .attr("class", "track")
+      .attr("x1", x.range()[0])
+      .attr("x2", x.range()[1])
+      .select(function () {
+        return this.parentNode.appendChild(this.cloneNode(true));
+      })
+      .attr("class", "track-inset")
+      .select(function () {
+        return this.parentNode.appendChild(this.cloneNode(true));
+      })
+      .attr("class", "track-overlay")
+      .call(
+        d3
+          .drag()
+          .on("start drag", function () {
+            d3.select("#colorIndicator").style("opacity", 1);
+            update(x.invert(d3.event.x));
+            getLightnessColor();
+          })
+          .on("end", function () {
+            //fin du drag
+            d3.select("#colorIndicator")
+              .transition()
+              .duration(1000)
+              .style("opacity", 0);
+            // getLightnessColor()
+          })
+      );
+
+    slider
+      .insert("g", ".track-overlay")
+      .attr("class", "ticks")
+      .attr("transform", "translate(0," + 18 + ")");
+
+    var handle = slider
+      .insert("circle", ".track-overlay")
+      .attr("fill", "red")
+      .attr("class", "handle")
+      .attr("r", 9);
+
+    function update(h) {
+      // update position and text of label according to slider scale
+      // conversion des valeurs
+
+      var color = setColorSlider(Math.round(x(h) * (1275 / 200)));
+      //console.log(color)
+      handle.attr("cx", x(h)); //x(h) taille du slider
+      drawChildren(current_element.children);
+      d3.select("#colorIndicator")
+        .attr("x", x(h) + 40)
+        .attr("fill", setColorSlider());
+    }
+
+    function setColorSlider(x) {
+      //f(x) = RGB
+      // couleur de départ rouge
+      //var R = 255, G=0, B=0;
+      //Rouge ==> Mauve
+      let seuil = 256;
+      if (x < seuil) {
+        R = 255;
+        G = x % seuil;
+        B = 0;
+      }
+      if (seuil < x && x < 2 * seuil) {
+        R = seuil - (x % seuil);
+        G = 255;
+        B = 0;
+      }
+      if (2 * seuil < x && x < 3 * seuil) {
+        R = 0;
+        G = 255;
+        B = x % seuil;
+      }
+      if (3 * seuil < x && x < 4 * seuil) {
+        R = 0;
+        G = 255 - (x % seuil);
+        B = 255;
+      }
+      if (4 * seuil < x && x < 5 * seuil) {
+        R = x % seuil;
+        G = 0;
+        B = 255;
+      }
+      //console.log("rgb = ",R,G,B);
+      return "rgb(" + R + "," + G + "," + B + ")";
+    }
+
+    function getLightnessColor() {
+      //établie la teinte de la couleur choisie pour les valeur min et max
+      //Modifier la luminosité des couleurs
+      //couleur claire = val MIN
+      //couleur Sombre =  val MAX
+
+      //Fixer la teinte..., Ne fonction pas avec toute la pallete de couleurs
+
+      MAX_COLOR = setColorSlider();
+      var brigthness = 0.4; //diminue la lumiere
+      var red = R * brigthness;
+      var green = G * brigthness;
+      var blue = B * brigthness;
+      var coef = 0.3;
+
+      if (R >= B && R >= G) {
+        R = 255;
+        G = G * coef;
+        B = B * coef;
+        if (G > 128 || B > 128) {
+          R = R * 0.7;
+        }
+      }
+
+      if (G >= B && G >= R) {
+        G = 255;
+        R = R * coef;
+        B = B * coef;
+        if (R > 128 || B > 128) {
+          G = G * 0.7;
+        }
+      }
+
+      if (B >= R && B >= G) {
+        B = 255;
+        G = G * coef;
+        R = R * coef;
+        if (G > 128 || R > 128) {
+          B = B * 0.7;
+        }
+      }
+
+      MAX_COLOR = "rgb(" + red + "," + green + "," + blue + ")";
+      MIN_COLOR =
+        "rgb(" +
+        Math.round(R) +
+        "," +
+        Math.round(G) +
+        "," +
+        Math.round(B) +
+        ")";
+
+      //couleur complémentaire pour la couleur du fond
+      BACKGROUND_COLOR =
+        "rgb(" +
+        Math.round(255 - red) +
+        "," +
+        Math.round(255 - green) +
+        "," +
+        Math.round(255 - blue) +
+        ")";
+
+      svgAnimation.style("background-color", BACKGROUND_COLOR);
+      drawChildren(current_element.children);
+    }
   }
 })(d3);

@@ -208,7 +208,7 @@ class Trials extends MY_Controller
                 $viewData['all_variablesName'] = array_column($this->Obs_unit_model->get_trial_var($trial_code), 'obs_variable');
                 $viewData['factors_list'] = $this->Trial_model->factors_lvl_list($trial_code);
                 $viewData['iconsName'] = array("variety" => "fa fa-leaf", "fertilization" => "fa fa-plus", "management" => "fa fa-inbox", "crop" => "fa fa-scissors", "system" => "fa fa-refresh");
-                $ajaxData['datavizHtml'] = $this->load->view('trial/dataviz/animatedMap2', $viewData, TRUE);
+                $ajaxData['datavizHtml'] = $this->load->view('trial/dataviz/animatedMap', $viewData, TRUE);
                 break;
 
             default:

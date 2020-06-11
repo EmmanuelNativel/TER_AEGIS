@@ -64,6 +64,4 @@
 
 /**
  * TODO :
- * - Nettoyage des fonctions côté serveur !
- * - Intégrer le travail de Julien
  */
