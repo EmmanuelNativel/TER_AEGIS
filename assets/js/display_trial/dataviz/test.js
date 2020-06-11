@@ -15,15 +15,12 @@
   let WIDTH = document.getElementById(div_id).clientWidth / 1.5;
   let HEIGHT = document.getElementById(div_id).clientWidth / 1.5;
   let svgAnimation = null; // SVG contenant l'animation
-  let MIN_COLOR = "#7DCEA0";
-  let MAX_COLOR = "#196F3D";
+  var MIN_COLOR = "#7DCEA0";
+  var MAX_COLOR = "#196F3D";
   const DEFAULT_COLOR = "rgba(23,32,42,1)";
-  let BACKGROUND_COLOR = "#784212";
+  var BACKGROUND_COLOR = "#784212";
   const LABEL_COLOR = "white";
   const NULL_COLOR = "#ACBD32"; // yellow
-  let R = 255,
-    G = 0,
-    B = 0;
   let path = [];
   const FACTORS_NAME = [
     "management",
@@ -38,12 +35,17 @@
   let selectedSystem = [];
   let selectedCrop = [];
   let timer = null;
+  var R = 255, G=0, B=0;
+
+  // On redessine la dataviz quand on redimensionne la fenêtre
+  // window.addEventListener("resize", redraw); //listener pour redessiner lors du resize
 
   var div = d3
     .select("body")
     .append("div")
     .attr("class", "tooltip")
     .style("width", "200px")
+    // .style("opacity", 0)
     .style("position", "absolute")
     .style("text-align", "center")
     .style("padding", "10px")
@@ -214,26 +216,11 @@
       type: "POST",
       dataType: "json",
       success: function (response) {
-        // const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
-        // current_element = root; // On indique l'élément courant
-        // onSuccessCallback(); // On va afficher les enfants de l'élément courant
-        loadParents(response.expData, onSuccessCallback);
-      },
-    });
-  }
-
-  function loadParents(data, onSuccessCallback) {
-    $.ajax({
-      url: SiteURL + "/Trials/ajaxLoadParents/",
-      data: {
-        trialCode: JSON.stringify(trialCode),
-      },
-      type: "POST",
-      dataType: "json",
-      success: function (response) {
-        // const all_data = data.concat(response.parents);
-        const root = prepareHierarchy(data, response.parents); // Préparation de la hiérarchie
+        const root = prepareHierarchy(response.expData); // Préparation de la hiérarchie
         current_element = root; // On indique l'élément courant
+        // VALUES = response.expValues;
+        // obs_values = prepareValues(response.expValues); // Préparation des valeurs
+        // current_values = JSON.parse(JSON.stringify(obs_values));
         onSuccessCallback(); // On va afficher les enfants de l'élément courant
       },
     });
@@ -258,59 +245,32 @@
     });
   }
 
-  // Préparation de la hiérarchie de données
-  function prepareHierarchy(data, parents) {
-    let max_lvl = 1; //va contenir la profondeur max des données
+  function prepareData(dataH, dataV) {
+    // Récupération des premiers enfants (les blocs)
+    const reducer = (accumulator, currentValue) =>
+      accumulator.add(currentValue.parent_unit_code);
+    const parents = Array.from(dataH.reduce(reducer, new Set()));
 
-    // Transformation des num_level en Number
-    data.map((e) => {
-      e.num_level = Number(e.num_level);
-      e.parent_num_level = Number(e.parent_num_level);
-      if (e.num_level > max_lvl) max_lvl = e.num_level;
-    });
-    parents.map((e) => {
-      e.num_level = Number(e.num_level);
-    });
+    var parseDate = d3.utcParse("%Y-%m-%d %H:%M:%S%Z");
 
-    let sub_hierarchy = []; // va contenir la hiérarchie sans le premier niveau
-
-    // On parcours les différents niveaux des données en commançant par le plus profond jusqu'au niveau 2 (sans les blocs)
-    for (let profondeur = max_lvl; profondeur >= 2; profondeur--) {
-      //On récupère les éléments qui ont la profondeur courante
-      const reducer = (accumulator, currentValue) => {
-        if (currentValue.num_level === profondeur) {
-          accumulator.push(currentValue);
-        }
-        return accumulator;
-      };
-
-      // On les regroupe par exp_unit_id
-      const elements = groupBy(
-        Array.from(data.reduce(reducer, [])),
-        "exp_unit_id"
+    // Insertion des valeurs et de leurs dates dans chaque parcelle
+    const dataWithValues = dataH.map((d) => {
+      const valuesChildren = dataV.filter(
+        (child) => child.exp_unit_id === d.exp_unit_id
       );
+      const valuesNeeded = valuesChildren.map((v) => ({
+        date: parseDate(v.date),
+        value: v.value,
+      }));
 
-      // On les regroupe par facteurs
-      const grouped_elements = groupFactors(elements);
+      return { ...d, values: valuesNeeded };
+    });
 
-      sub_hierarchy = grouped_elements.map((p) => {
-        return {
-          ...p,
-          children: sub_hierarchy.filter((e) => {
-            return p.exp_unit_id === e.parent_unit_id;
-            //return p.name.search(e.parent_unit_code) !== -1 && e.parent_num_level === p.num_level;
-          }),
-        };
-      });
-    }
-
-    // On ajoute les blocs
+    // A chaque bloc on y ajoute ses parcelles
     const hierarchy = parents.map((p) => {
       return {
-        ...p,
-        children: sub_hierarchy.filter(
-          (e) => e.parent_unit_id === p.exp_unit_id
-        ),
+        name: p,
+        children: dataWithValues.filter((d) => d.parent_unit_code === p),
       };
     });
 
@@ -321,6 +281,171 @@
     };
 
     const root = d3.hierarchy(data);
+
+    return root;
+  }
+
+  function prepareHierarchy2(data) {
+    // Récupération des premiers enfants (les blocs)
+    const reducer = (accumulator, currentValue) =>
+      accumulator.add(currentValue.parent_unit_code);
+    const parents = Array.from(data.reduce(reducer, new Set()));
+
+    // Regroupement des données par factor et par factor_level
+    const groups = groupBy(data, "exp_unit_id"); // Grouper par unité expérimentale
+    const children = []; // Va contenir les enfants
+
+    for (const exp_id in groups) {
+      const exp = groups[exp_id];
+
+      const res = exp.reduce((acc, curr) => {
+        const factor = curr.factor;
+        const factor_level = curr.factor_level;
+        const factor_desc = curr.factor_level_description;
+        const exp_unit_id = curr.exp_unit_id;
+        const level_label = curr.level_label;
+        const name = curr.name;
+        const parent_level_label = curr.parent_level_label;
+        const parent_unit_code = curr.parent_unit_code;
+
+        if (!acc.hasOwnProperty("exp_unit_id")) {
+          acc["exp_unit_id"] = exp_unit_id;
+          acc["level_label"] = level_label;
+          acc["name"] = name;
+          acc["parent_level_label"] = parent_level_label;
+          acc["parent_unit_code"] = parent_unit_code;
+          acc["factors"] = {};
+        }
+
+        if (acc.factors.hasOwnProperty(factor)) {
+          acc.factors[factor].level.push(factor_level);
+          acc.factors[factor].description.push(factor_desc);
+        } else {
+          acc.factors[factor] = {
+            level: [factor_level],
+            description: [factor_desc],
+          };
+        }
+
+        return acc;
+      }, {});
+
+      children.push(res);
+    }
+
+    // A chaque bloc on y ajoute ses parcelles
+    const hierarchy = parents.map((p) => {
+      return {
+        name: p,
+        children: children.filter((d) => d.parent_unit_code === p),
+      };
+    });
+
+    // On ajoute l'essai en racine de la hiérarchie
+    data = {
+      name: trialCode,
+      children: hierarchy,
+    };
+
+    const root = d3.hierarchy(data);
+
+    return root;
+  }
+
+  function prepareHierarchy(data) {
+    // Récupération des premiers enfants (les blocs)
+    const reducer1 = (accumulator, currentValue) => {
+      if (
+        currentValue.parent_level_label === "Bloc" ||
+        currentValue.parent_level_label === "bloc"
+      ) {
+        return accumulator.add(currentValue.parent_unit_code);
+      } else return accumulator;
+    };
+    const blocs = Array.from(data.reduce(reducer1, new Set()));
+
+    // Récupération des parcelles
+    // Pour prendre en compte les sous-parcelles qui ont un bloc comme parent, il faut ajouter les sous-parcelles ici !
+    const reducer2 = (accumulator, currentValue) => {
+      if (
+        (currentValue.level_label === "parcelle" ||
+          currentValue.level_label === "plot") &&
+        (currentValue.parent_level_label === "Bloc" ||
+          currentValue.parent_level_label === "bloc")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const parcelles = groupBy(
+      Array.from(data.reduce(reducer2, [])),
+      "exp_unit_id"
+    );
+
+    // Récupération des sous_parcelles
+    const reducer3 = (accumulator, currentValue) => {
+      if (
+        currentValue.level_label === "sous_parcelle" &&
+        (currentValue.parent_level_label === "parcelle" ||
+          currentValue.parent_level_label === "plot")
+      ) {
+        accumulator.push(currentValue);
+      }
+      return accumulator;
+    };
+    const sous_parcelles = groupBy(
+      Array.from(data.reduce(reducer3, [])),
+      "exp_unit_id"
+    );
+
+    let sous_parcelles_grouped = []; // Va contenir les sous_parcelles
+    let parcelles_grouped = []; // Va contenir les parcelles
+
+    // Regroupement des sous_parcelles par factor et par factor_level
+    if (sous_parcelles.length !== 0) {
+      sous_parcelles_grouped = groupFactors(sous_parcelles);
+    }
+
+    // Regroupement des parcelles par factor et par factor_level
+    if (parcelles.length !== 0) {
+      parcelles_grouped = groupFactors(parcelles);
+    }
+
+    // Traitement des sous_parcelles --> Si il y a des horizons à ajouter, il faut ajouter ici !
+    sous_parcelles_grouped = sous_parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: [],
+      };
+    });
+
+    // A chaque parcelle on y ajoute ses sous-parcelles
+    const hierarchy_parcelles = parcelles_grouped.map((p) => {
+      return {
+        ...p,
+        children: sous_parcelles_grouped.filter(
+          (d) => p.name.search(d.parent_unit_code) !== -1
+        ),
+      };
+    });
+
+    // A chaque bloc on y ajoute ses parcelles
+    const hierarchy = blocs.map((p) => {
+      return {
+        name: p,
+        children: hierarchy_parcelles.filter((d) => d.parent_unit_code === p),
+      };
+    });
+
+    // On ajoute l'essai en racine de la hiérarchie
+    data = {
+      name: trialCode,
+      children: hierarchy,
+    };
+
+    const root = d3.hierarchy(data);
+
+    console.log("root", root);
 
     return root;
   }
@@ -336,22 +461,16 @@
         const factor_desc = curr.factor_level_description;
         const exp_unit_id = curr.exp_unit_id;
         const level_label = curr.level_label;
-        const num_level = curr.num_level;
         const name = curr.name;
         const parent_level_label = curr.parent_level_label;
         const parent_unit_code = curr.parent_unit_code;
-        const parent_num_level = curr.parent_num_level;
-        const parent_unit_id = curr.parent_unit_id;
 
         if (!acc.hasOwnProperty("exp_unit_id")) {
           acc["exp_unit_id"] = exp_unit_id;
           acc["level_label"] = level_label;
-          acc["num_level"] = num_level;
           acc["name"] = name;
           acc["parent_level_label"] = parent_level_label;
           acc["parent_unit_code"] = parent_unit_code;
-          acc["parent_num_level"] = parent_num_level;
-          acc["parent_unit_id"] = parent_unit_id;
           acc["factors"] = {};
         }
 
@@ -580,6 +699,7 @@
       })
       .on("mouseover", (d, i) => {
         if (d.depth > 1) {
+          
           //coordornné x,y en fonction de la svg
           var x = (i % maxRectInLine) * rectWidth + rectWidth / 2 - rectPadding;
           var y = Math.trunc(i / maxRectInLine) * rectHeight + rectHeight;
@@ -694,7 +814,7 @@
     // NAME
     labels
       .append("tspan")
-      .text((d) => (d.depth === 1 ? d.data.name : d.data.exp_unit_id))
+      .text((d) => (d.depth === 1 ? d.data.name : d.data.name+" : "+d.data.level_label))
       .attr("x", (d, i) =>
         animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
       )
@@ -703,6 +823,34 @@
           return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
         else
           return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight * 0.1;
+        // return (
+        //   Math.trunc(i / maxRectInLine) * rectHeight +
+        //   rectHeight / (d.depth === 1 ? 2 : 7)
+        // );
+      })
+      .attr("id", (d, i) => "label_" + i)
+      .attr("width", rectWidth)
+      // .attr("font-size", "1rem")
+      .attr("fill", LABEL_COLOR)
+      .attr("text-anchor", "middle")
+      .style("font-weight", "bold")
+      .each(getNameSize)
+      .style("font-size", function (d) {
+        return d.scale + "px";
+      });
+
+    // unit Id
+    labels
+      .append("tspan")
+      .text((d) => (d.depth === 1 ? d.data.name : d.data.exp_unit_id))
+      .attr("x", (d, i) =>
+        animation ? 0 : (i % maxRectInLine) * rectWidth + rectWidth / 2
+      )
+      .attr("y", (d, i) => {
+        if (d.depth === 1)
+          return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight / 2;
+        else
+          return Math.trunc(i / maxRectInLine) * rectHeight + rectHeight * 0.2;
         // return (
         //   Math.trunc(i / maxRectInLine) * rectHeight +
         //   rectHeight / (d.depth === 1 ? 2 : 7)
@@ -982,8 +1130,6 @@
 
   function getDescriptionText(d) {
     let text = "<h3>Description</h3>";
-    text += "<p><b>Name : </b>" + d.data.name + "<br/></p>";
-    text += "<p><b>Type : </b>" + d.data.level_label + "</p>";
     const factors = d.data.factors;
     if (selectedManagement.length > 0) {
       text += "<b>Management :</b><br/>";
@@ -1068,7 +1214,8 @@
     var height = 100;
 
     var formatDateIntoMY = d3.timeFormat("%m/%Y");
-    var formatDate = d3.timeFormat("%d %b %Y");
+    var formatDate = d3.timeFormat("%d-%b-%y");//affichage jours/mois/année
+                   //d3.timeFormat("%b %Y");
     var formatDateComplet = d3.timeFormat("%d-%m-%Y");
 
     var moving = false;
@@ -1094,13 +1241,7 @@
         .attr("x", 70)
         .attr("y", height / 2);
     } else {
-      let newdMax = new Date(dMax.getFullYear(),dMax.getMonth(),dMax.getDate()+1);
-      var x = d3
-        .scaleTime()
-        .domain([dMin, newdMax])
-        .nice()
-        .range([0, width])
-        .clamp(true);
+      var x = d3.scaleTime().domain([dMin, dMax]).range([0, width]).clamp(true);
 
       var slider = svgSlider
         .append("g")
@@ -1211,7 +1352,7 @@
       if (exactDates.length > 0) current_values[exp_unit] = exactDates[0];
       else {
         const bestLowerDateValue = values
-          .filter((v) => v.date <= date)
+          .filter((v) => v.date < date)
           .slice(-1)[0];
 
         // current_values[exp_unit] = bestValue;
@@ -1271,9 +1412,9 @@
   }
 
   //Séléction couleurs
-  function createColorSelect() {
-    d3.select("#sliderColor").remove();
-
+  function createColorSelect(){
+     d3.select("#sliderColor").remove()
+    
     var margin = { top: 0, right: 50, bottom: 0, left: 50 };
     var width = 200;
     var height = 100;
@@ -1281,22 +1422,24 @@
     var svgSlider = d3
       .select("#menuSetting")
       .append("svg")
-      .attr("id", "sliderColor")
+      .attr("id","sliderColor")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height);
 
     svgSlider
-      .append("rect")
-      .attr("id", "colorIndicator")
-      .attr("x", 40)
-      .attr("y", 20)
-      .attr("width", 20)
-      .attr("height", 20)
-      .style("opacity", 0)
-      .attr("rx", 15)
-      .attr("ry", 15);
+    .append("rect")
+    .attr("id","colorIndicator")
+    .attr("x",40)
+    .attr("y",20)
+    .attr("width",20)
+    .attr("height",20)
+    .style("opacity",0)
+    .attr("rx", 15)
+    .attr("ry", 15)
 
-    svgSlider.append("text").text("Couleurs").attr("x", 25).attr("y", 20).style("font-weight", 'bold').style("fill", "grey")
+    svgSlider.append("text").text("Couleurs")
+    .attr("x",25)
+    .attr("y",20);
 
     var x = d3.scaleTime().domain([0, 1275]).range([0, width]).clamp(true);
 
@@ -1304,6 +1447,7 @@
       .append("g")
       .attr("class", "slider")
       .attr("transform", "translate(" + margin.left + "," + height / 2 + ")");
+     
 
     slider
       .append("line")
@@ -1322,16 +1466,15 @@
         d3
           .drag()
           .on("start drag", function () {
-            d3.select("#colorIndicator").style("opacity", 1);
+            d3.select("#colorIndicator").style("opacity",1)
             update(x.invert(d3.event.x));
-            getLightnessColor();
+            getLightnessColor()
           })
-          .on("end", function () {
-            //fin du drag
+          .on("end", function () {//fin du drag
             d3.select("#colorIndicator")
-              .transition()
-              .duration(1000)
-              .style("opacity", 0);
+            .transition()
+            .duration(1000)
+            .style("opacity",0);
             // getLightnessColor()
           })
       );
@@ -1339,126 +1482,124 @@
     slider
       .insert("g", ".track-overlay")
       .attr("class", "ticks")
-      .attr("transform", "translate(0," + 18 + ")");
+      .attr("transform", "translate(0," + 18 + ")")
+      
 
     var handle = slider
       .insert("circle", ".track-overlay")
-      .attr("fill", "red")
+      .attr("fill","red")
       .attr("class", "handle")
       .attr("r", 9);
-
+    
+    
+    
     function update(h) {
       // update position and text of label according to slider scale
       // conversion des valeurs
-
-      var color = setColorSlider(Math.round(x(h) * (1275 / 200)));
+      
+      
+      var color = setColorSlider(Math.round(x(h)*(1275/200)));
       //console.log(color)
       handle.attr("cx", x(h)); //x(h) taille du slider
       drawChildren(current_element.children);
       d3.select("#colorIndicator")
-        .attr("x", x(h) + 40)
-        .attr("fill", setColorSlider());
+      .attr("x",x(h)+40)
+      .attr("fill",setColorSlider());
+      
     }
-
-    function setColorSlider(x) {
-      //f(x) = RGB
+     
+    function setColorSlider(x) { //f(x) = RGB
       // couleur de départ rouge
       //var R = 255, G=0, B=0;
       //Rouge ==> Mauve
       let seuil = 256;
-      if (x < seuil) {
-        R = 255;
-        G = x % seuil;
-        B = 0;
+      if(x<seuil) {
+        R = 255.
+        G = x%seuil;
+        B = 0.
+      };
+      if(seuil<x && x<2*seuil) {
+        R = seuil - (x%seuil)
+        G = 255
+        B = 0
       }
-      if (seuil < x && x < 2 * seuil) {
-        R = seuil - (x % seuil);
-        G = 255;
-        B = 0;
+      if(2*seuil<x && x < 3*seuil) {
+        R = 0
+        G = 255
+        B = (x%seuil)
+        
       }
-      if (2 * seuil < x && x < 3 * seuil) {
-        R = 0;
-        G = 255;
-        B = x % seuil;
+      if(3*seuil<x && x < 4*seuil) {
+        R = 0
+        G = 255 -(x%seuil)
+        B = 255
       }
-      if (3 * seuil < x && x < 4 * seuil) {
-        R = 0;
-        G = 255 - (x % seuil);
-        B = 255;
-      }
-      if (4 * seuil < x && x < 5 * seuil) {
-        R = x % seuil;
-        G = 0;
-        B = 255;
+      if(4*seuil<x && x <5*seuil) {
+        R = x%seuil
+        G = 0
+        B = 255
       }
       //console.log("rgb = ",R,G,B);
-      return "rgb(" + R + "," + G + "," + B + ")";
+      return "rgb("+R+","+G+","+B+")"
+
     }
 
-    function getLightnessColor() {
-      //établie la teinte de la couleur choisie pour les valeur min et max
+    function getLightnessColor(){//établie la teinte de la couleur choisie pour les valeur min et max
       //Modifier la luminosité des couleurs
       //couleur claire = val MIN
       //couleur Sombre =  val MAX
 
       //Fixer la teinte..., Ne fonction pas avec toute la pallete de couleurs
 
+
       MAX_COLOR = setColorSlider();
-      var brigthness = 0.4; //diminue la lumiere
-      var red = R * brigthness;
-      var green = G * brigthness;
-      var blue = B * brigthness;
+      var brigthness = 0.4 //diminue la lumiere
+      var red = R*brigthness;
+      var green = G*brigthness;
+      var blue = B*brigthness;
       var coef = 0.3;
-
-      if (R >= B && R >= G) {
+      
+      if (R>=B && R>=G) {
         R = 255;
-        G = G * coef;
-        B = B * coef;
-        if (G > 128 || B > 128) {
-          R = R * 0.7;
+        G = G*coef
+        B = B*coef
+        if (G>128||B>128) {
+          R = R*0.7
         }
       }
 
-      if (G >= B && G >= R) {
+      if (G>=B && G>=R) {
         G = 255;
-        R = R * coef;
-        B = B * coef;
-        if (R > 128 || B > 128) {
-          G = G * 0.7;
+        R = R*coef;
+        B = B*coef;
+        if (R>128||B>128) {
+          G = G*0.7
         }
       }
 
-      if (B >= R && B >= G) {
+      if (B>=R && B>=G) {
         B = 255;
-        G = G * coef;
-        R = R * coef;
-        if (G > 128 || R > 128) {
-          B = B * 0.7;
+        G = G*coef;
+        R = R*coef;
+        if (G>128||R>128) {
+          B = B*0.7
         }
       }
-
-      MAX_COLOR = "rgb(" + red + "," + green + "," + blue + ")";
-      MIN_COLOR =
-        "rgb(" +
-        Math.round(R) +
-        "," +
-        Math.round(G) +
-        "," +
-        Math.round(B) +
-        ")";
-
+      
+      MAX_COLOR = "rgb("+red+","+green+","+blue+")";
+      MIN_COLOR = "rgb("+Math.round(R)+","+Math.round(G)+","+Math.round(B)+")";
+      console.log("maxColor = ",MAX_COLOR);
+      console.log("minColor = ",MIN_COLOR);
+      
       //couleur complémentaire pour la couleur du fond
-      BACKGROUND_COLOR =
-        "rgb(" +
-        Math.round(255 - red) +
-        "," +
-        Math.round(255 - green) +
-        "," +
-        Math.round(255 - blue) +
-        ")";
-
+      BACKGROUND_COLOR = "rgb("+Math.round(255-red)+","+Math.round(255-green)+","+Math.round(255-blue)+")";
+      
       svgAnimation.style("background-color", BACKGROUND_COLOR);
       drawChildren(current_element.children);
+
+      
+      
     }
+
   }
 })(d3);

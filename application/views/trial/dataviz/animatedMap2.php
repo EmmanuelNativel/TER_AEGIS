@@ -1,7 +1,7 @@
 <!-- TODO: Changer les paramètres pour cette visualisation -->
 <div class="boxed-content">
   <h3><?= $datavizTitle ?></h3>
-  <div class="row">
+  <div class="row" id="menuSetting">
 
     <div class="col col-xs-4 col-sm-4 col-md-4">
       <p>
