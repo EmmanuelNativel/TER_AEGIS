@@ -671,11 +671,6 @@ class Trials extends MY_Controller
         $ajaxData = array(); //tableau qui sera retourné
         $trialCode =  json_decode($this->input->post('trialCode'));
         $factors =  json_decode($this->input->post('factors'));
-        // $obs_value =  json_decode($this->input->post('obs_value'));
-
-        // Récupération des valeurs de la variable à observer
-        // if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value);
-        // else $expValues = [];
 
         // Récupération de la hiérarchie (blocs/parcelles...)
         $expData = $this->Trial_model->get_trial_hierarchy_data($trialCode, $factors);
@@ -693,7 +688,7 @@ class Trials extends MY_Controller
         $parent_name = json_decode($this->input->post('parent_name'));
 
         // Récupération des valeurs de la variable à observer
-        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values2($trialCode, $obs_value, $parent_name);
+        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value, $parent_name);
         else $expValues = [];
 
         // Récupération de la hiérarchie (blocs/parcelles...)
@@ -702,16 +697,13 @@ class Trials extends MY_Controller
         echo json_encode($ajaxData);
     }
 
-    public function ajaxUpdateValues()
+    public function ajaxLoadParents()
     {
         $ajaxData = array(); //tableau qui sera retourné
         $trialCode =  json_decode($this->input->post('trialCode'));
-        $obs_value =  json_decode($this->input->post('obs_value'));
 
-        // Récupération des valeurs de la variable à observer
-        if ($obs_value != "") $ajaxData = $this->Trial_model->get_exp_data_values($trialCode, $obs_value);
-        else $ajaxData = [];
-
+        $response = $this->Trial_model->get_parents($trialCode);
+        $ajaxData['parents'] = $response;
         echo json_encode($ajaxData);
     }
 }

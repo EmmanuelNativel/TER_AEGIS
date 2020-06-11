@@ -65,5 +65,5 @@
 /**
  * TODO :
  * - Nettoyage des fonctions côté serveur !
- * - Changer le changement des couleurs des carrés, seulement quand on dépasse la date
+ * - Intégrer le travail de Julien
  */

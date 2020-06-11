@@ -250,6 +250,7 @@ class Trial_model extends MY_Model
         "e.level_label",
         "e.num_level",
         "e2.unit_code as parent_unit_code",
+        "e2.exp_unit_id as parent_unit_id",
         "e2.level_label as parent_level_label",
         "e2.num_level as parent_num_level",
         "f.factor",
@@ -272,35 +273,9 @@ class Trial_model extends MY_Model
       ->result_array();
   }
 
-  /**
-   * Récupération des valeurs des variables observée et des infos qui y sont liées
-   * (exp_unit, level_label, value, date, variable)
-   */
-  public function get_exp_data_values($trial_code, $obs_variable)
-  {
-    $select = array(
-      "e.exp_unit_id",
-      "e.level_label",
-      "e2.unit_code as parent_unit_code",
-      "ob.obs_value as value",
-      "ob.obs_date as date",
-      "ob.obs_variable as variable"
-    );
 
-    return $this->db->select($select)
-      ->from("exp_unit e")
-      ->join("exp_unit e2", "e2.exp_unit_id = e.assigned_to")
-      ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id ")
-      ->where("e.trial_code", $trial_code)
-      ->where_in("e.level_label", array('plot', 'parcelle'))
-      ->where("ob.obs_variable", $obs_variable)
-      ->order_by("exp_unit_id", "ASC")
-      ->order_by("obs_date", "ASC")
-      ->get()
-      ->result_array();
-  }
 
-  public function get_exp_data_values2($trial_code, $obs_variable, $parent_name)
+  public function get_exp_data_values($trial_code, $obs_variable, $parent_name)
   {
     $select = array(
       "e.exp_unit_id",
@@ -319,7 +294,7 @@ class Trial_model extends MY_Model
       ->join("variable v", "v.variable_code = ob.obs_variable")
       ->where("e.trial_code", $trial_code)
       ->where("e2.unit_code", $parent_name)
-      ->where_in("e.level_label", array('plot', 'parcelle'))
+      // ->where_in("e.level_label", array('plot', 'parcelle'))
       ->where("ob.obs_variable", $obs_variable)
       ->order_by("exp_unit_id", "ASC")
       ->order_by("obs_date", "ASC")
@@ -342,6 +317,24 @@ class Trial_model extends MY_Model
       ->join("factor f", "f.factor_id = fl.factor_id")
       ->where('e.trial_code', $trial_code)
       ->order_by('f.factor, fl.factor_level')
+      ->get()
+      ->result_array();
+  }
+
+  function get_parents($trial_code)
+  {
+    $selectedFields = array(
+      "unit_code as name",
+      "num_level",
+      "level_label",
+      "exp_unit_id"
+    );
+
+    return $this->db->distinct()
+      ->select($selectedFields)
+      ->from("exp_unit")
+      ->where('trial_code', $trial_code)
+      ->where('num_level', '1')
       ->get()
       ->result_array();
   }
