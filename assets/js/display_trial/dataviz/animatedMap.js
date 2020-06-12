@@ -135,14 +135,19 @@
     // onChange(/*() => drawSlider(dateMin, dateMax)*/);
 
     div.style("display", "none");
-    loadValues(current_element.data.name, () => {
-      updateValues(selected_date);
-      getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
-      drawChildren(current_element.children);
-      drawSlider(dateMin, dateMax);
-      getPath(current_element);
-      createColorSelect();
-    });
+    console.log("current_element.data.exp_unit_id", current_element.data.exp_unit_id);
+    loadValues(
+      current_element.data.name,
+      current_element.data.exp_unit_id,
+      () => {
+        updateValues(selected_date);
+        getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
+        drawChildren(current_element.children);
+        drawSlider(dateMin, dateMax);
+        getPath(current_element);
+        createColorSelect();
+      }
+    );
   });
 
   function onChange(optionalCallback = () => {}) {
@@ -239,13 +244,14 @@
     });
   }
 
-  function loadValues(parentName, onSuccessCallback) {
+  function loadValues(parentName, parentId, onSuccessCallback) {
     $.ajax({
       url: SiteURL + "/Trials/ajaxLoadValuesForAnimatedMap/",
       data: {
         trialCode: JSON.stringify(trialCode),
         obs_value: JSON.stringify(selectedVariable),
         parent_name: JSON.stringify(parentName),
+        parent_id: JSON.stringify(parentId),
       },
       type: "POST",
       dataType: "json",
@@ -569,13 +575,17 @@
       .on("click", (d, i) => {
         if (d.hasOwnProperty("children")) {
           current_element = d; // On change l'élément courant
-          loadValues(current_element.data.name, () => {
-            updateValues(selected_date);
-            getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
-            AnimationZoom(i, current_element.children); //ajout Animation zoom
-            drawSlider(dateMin, dateMax);
-            getPath(d);
-          });
+          loadValues(
+            current_element.data.name,
+            current_element.data.exp_unit_id,
+            () => {
+              updateValues(selected_date);
+              getValuesRange(current_element.data.name); // On fixe les bornes des valeurs pour le scaling des couleurs
+              AnimationZoom(i, current_element.children); //ajout Animation zoom
+              drawSlider(dateMin, dateMax);
+              getPath(d);
+            }
+          );
         } else console.log("L'élément sélectionné n'a pas d'enfants !");
       })
       .on("mouseover", (d, i) => {
@@ -1094,7 +1104,11 @@
         .attr("x", 70)
         .attr("y", height / 2);
     } else {
-      let newdMax = new Date(dMax.getFullYear(),dMax.getMonth(),dMax.getDate()+1);
+      let newdMax = new Date(
+        dMax.getFullYear(),
+        dMax.getMonth(),
+        dMax.getDate() + 1
+      );
       var x = d3
         .scaleTime()
         .domain([dMin, newdMax])
@@ -1296,7 +1310,13 @@
       .attr("rx", 15)
       .attr("ry", 15);
 
-    svgSlider.append("text").text("Couleurs").attr("x", 25).attr("y", 20).style("font-weight", 'bold').style("fill", "grey")
+    svgSlider
+      .append("text")
+      .text("Couleurs")
+      .attr("x", 25)
+      .attr("y", 20)
+      .style("font-weight", "bold")
+      .style("fill", "grey");
 
     var x = d3.scaleTime().domain([0, 1275]).range([0, width]).clamp(true);
 

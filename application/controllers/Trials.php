@@ -686,9 +686,10 @@ class Trials extends MY_Controller
         $trialCode =  json_decode($this->input->post('trialCode'));
         $obs_value =  json_decode($this->input->post('obs_value'));
         $parent_name = json_decode($this->input->post('parent_name'));
+        $parent_id = json_decode($this->input->post('parent_id'));
 
         // Récupération des valeurs de la variable à observer
-        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value, $parent_name);
+        if ($obs_value != "") $expValues = $this->Trial_model->get_exp_data_values($trialCode, $obs_value, $parent_name, $parent_id);
         else $expValues = [];
 
         // Récupération de la hiérarchie (blocs/parcelles...)

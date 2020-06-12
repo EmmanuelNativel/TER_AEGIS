@@ -275,11 +275,12 @@ class Trial_model extends MY_Model
 
 
 
-  public function get_exp_data_values($trial_code, $obs_variable, $parent_name)
+  public function get_exp_data_values($trial_code, $obs_variable, $parent_name, $parent_id)
   {
     $select = array(
       "e.exp_unit_id",
       "e.level_label",
+      "e2.exp_unit_id as parent_id",
       "e2.unit_code as parent_unit_code",
       "ob.obs_value as value",
       "ob.obs_date as date",
@@ -293,8 +294,8 @@ class Trial_model extends MY_Model
       ->join("obs_unit ob", "e.exp_unit_id = ob.unit_id")
       ->join("variable v", "v.variable_code = ob.obs_variable")
       ->where("e.trial_code", $trial_code)
-      ->where("e2.unit_code", $parent_name)
-      // ->where_in("e.level_label", array('plot', 'parcelle'))
+      // ->where("e2.unit_code", $parent_name)
+      ->where("e2.exp_unit_id", $parent_id)
       ->where("ob.obs_variable", $obs_variable)
       ->order_by("exp_unit_id", "ASC")
       ->order_by("obs_date", "ASC")
