@@ -20,7 +20,7 @@
   const DEFAULT_COLOR = "rgba(23,32,42,1)";
   let BACKGROUND_COLOR = "#784212";
   const LABEL_COLOR = "white";
-  const NULL_COLOR = "#ACBD32"; // yellow
+  const NULL_COLOR = "rgb(90,90,90)"; // gris
   let R = 255,
     G = 0,
     B = 0;
@@ -135,7 +135,10 @@
     // onChange(/*() => drawSlider(dateMin, dateMax)*/);
 
     div.style("display", "none");
-    console.log("current_element.data.exp_unit_id", current_element.data.exp_unit_id);
+    console.log(
+      "current_element.data.exp_unit_id",
+      current_element.data.exp_unit_id
+    );
     loadValues(
       current_element.data.name,
       current_element.data.exp_unit_id,
@@ -268,7 +271,7 @@
   function prepareHierarchy(data, parents) {
     let max_lvl = 1; //va contenir la profondeur max des données
 
-    // Transformation des num_level en Number
+    // Transformation des num_level en Number et détermination de la profondeur max de l'arbre
     data.map((e) => {
       e.num_level = Number(e.num_level);
       e.parent_num_level = Number(e.parent_num_level);
@@ -299,6 +302,7 @@
       // On les regroupe par facteurs
       const grouped_elements = groupFactors(elements);
 
+      // On ajoute les en enfants de chaque élément, si il y en a
       sub_hierarchy = grouped_elements.map((p) => {
         return {
           ...p,
@@ -310,7 +314,7 @@
       });
     }
 
-    // On ajoute les blocs
+    // On ajoute les éléments de profondeur 1
     const hierarchy = parents.map((p) => {
       return {
         ...p,
@@ -1423,7 +1427,7 @@
 
       //Fixer la teinte..., Ne fonction pas avec toute la pallete de couleurs
 
-      MAX_COLOR = setColorSlider();
+      // MAX_COLOR = setColorSlider();
       var brigthness = 0.4; //diminue la lumiere
       var red = R * brigthness;
       var green = G * brigthness;
@@ -1466,6 +1470,9 @@
         "," +
         Math.round(B) +
         ")";
+
+      // Indicateur des couleurs
+      d3.select("#colorIndicator").attr("fill", MIN_COLOR);
 
       //couleur complémentaire pour la couleur du fond
       BACKGROUND_COLOR =
